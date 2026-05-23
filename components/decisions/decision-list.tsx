@@ -67,6 +67,14 @@ export function DecisionList({ decisions }: { decisions: DecisionWithScore[] }) 
   }, [category, decisions, score, search, sort, status]);
 
   function remove(id: string) {
+    if (
+      !window.confirm(
+        "Remove this decision? This permanently deletes its options and history."
+      )
+    ) {
+      return;
+    }
+
     setPendingId(id);
     startTransition(async () => {
       const result = await deleteDecisionAction(id);

@@ -1,5 +1,6 @@
 "use server";
 
+import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth";
 import { isoDate } from "@/lib/utils";
@@ -393,6 +394,18 @@ const demoDecisions: DemoDecision[] = [
 export async function seedDemoDataAction() {
   const { supabase, user } = await requireUser();
 
+  const { count, error: countError } = await supabase
+    .from("decisions")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", user.id)
+    .eq("is_demo", true);
+
+  if (countError) return { ok: false, message: countError.message };
+
+  if ((count ?? 0) >= demoDecisions.length) {
+    return { ok: true, message: "Demo data already loaded." };
+  }
+
   const { error: deleteError } = await supabase
     .from("decisions")
     .delete()
@@ -401,23 +414,25 @@ export async function seedDemoDataAction() {
 
   if (deleteError) return { ok: false, message: deleteError.message };
 
+  const decisionRows = [];
+  const optionRows = [];
+  const prosConsRows = [];
+  const eventRows = [];
+
   for (const demo of demoDecisions) {
     const { options, ...decision } = demo;
-    const { data: inserted, error: decisionError } = await supabase
-      .from("decisions")
-      .insert({
-        ...decision,
-        user_id: user.id,
-        status: "open",
-        is_demo: true
-      })
-      .select("id")
-      .single();
+    const decisionId = randomUUID();
 
-    if (decisionError) return { ok: false, message: decisionError.message };
+    decisionRows.push({
+      ...decision,
+      id: decisionId,
+      user_id: user.id,
+      status: "open" as const,
+      is_demo: true
+    });
 
-    await supabase.from("decision_events").insert({
-      decision_id: inserted.id,
+    eventRows.push({
+      decision_id: decisionId,
       user_id: user.id,
       event_type: "demo_seeded",
       title: "Demo decision loaded",
@@ -427,43 +442,53 @@ export async function seedDemoDataAction() {
 
     for (const option of options) {
       const { pros, cons, ...optionPayload } = option;
-      const { data: insertedOption, error: optionError } = await supabase
-        .from("decision_options")
-        .insert({
-          ...optionPayload,
-          decision_id: inserted.id,
-          user_id: user.id
-        })
-        .select("id")
-        .single();
+      const optionId = randomUUID();
 
-      if (optionError) return { ok: false, message: optionError.message };
+      optionRows.push({
+        ...optionPayload,
+        id: optionId,
+        decision_id: decisionId,
+        user_id: user.id
+      });
 
-      const rows = [
+      prosConsRows.push(
         ...pros.map((body) => ({
           body,
           kind: "pro" as const,
-          option_id: insertedOption.id,
-          decision_id: inserted.id,
+          option_id: optionId,
+          decision_id: decisionId,
           user_id: user.id
         })),
         ...cons.map((body) => ({
           body,
           kind: "con" as const,
-          option_id: insertedOption.id,
-          decision_id: inserted.id,
+          option_id: optionId,
+          decision_id: decisionId,
           user_id: user.id
         }))
-      ];
-
-      if (rows.length > 0) {
-        const { error: prosConsError } = await supabase
-          .from("decision_option_pros_cons")
-          .insert(rows);
-        if (prosConsError) return { ok: false, message: prosConsError.message };
-      }
+      );
     }
   }
+
+  const { error: decisionsError } = await supabase
+    .from("decisions")
+    .insert(decisionRows);
+  if (decisionsError) return { ok: false, message: decisionsError.message };
+
+  const { error: eventsError } = await supabase
+    .from("decision_events")
+    .insert(eventRows);
+  if (eventsError) return { ok: false, message: eventsError.message };
+
+  const { error: optionsError } = await supabase
+    .from("decision_options")
+    .insert(optionRows);
+  if (optionsError) return { ok: false, message: optionsError.message };
+
+  const { error: prosConsError } = await supabase
+    .from("decision_option_pros_cons")
+    .insert(prosConsRows);
+  if (prosConsError) return { ok: false, message: prosConsError.message };
 
   revalidatePath("/dashboard");
   revalidatePath("/decisions");

@@ -49,11 +49,12 @@ export function AppShell({
               <Button
                 type="submit"
                 variant="ghost"
-                size="icon"
+                size="sm"
                 aria-label="Log out"
                 title="Log out"
               >
                 <LogOut className="h-4 w-4" />
+                <span className="hidden sm:inline">Log out</span>
               </Button>
             </form>
           </div>

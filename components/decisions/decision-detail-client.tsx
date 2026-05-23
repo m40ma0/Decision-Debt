@@ -25,7 +25,7 @@ import { ResolutionPanel } from "@/components/decisions/resolution-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Field, Input, Textarea } from "@/components/ui/field";
+import { Field, Input, Select, Textarea } from "@/components/ui/field";
 import { useToast } from "@/components/toast-provider";
 import { categoryLabels, stakesLabels, statusLabels } from "@/lib/constants";
 import type { DecisionDetail, OptionWithProsCons } from "@/lib/queries";
@@ -309,6 +309,14 @@ function OptionCard({ option }: { option: OptionWithProsCons }) {
   }
 
   function removeOption() {
+    if (
+      !window.confirm(
+        "Remove this option? Its pros and cons will be permanently deleted."
+      )
+    ) {
+      return;
+    }
+
     startTransition(async () => {
       const result = await deleteOptionAction(option.id, option.decision_id);
       toast({ title: result.message, tone: result.ok ? "success" : "error" });
@@ -334,6 +342,8 @@ function OptionCard({ option }: { option: OptionWithProsCons }) {
   }
 
   function removeItem(id: string) {
+    if (!window.confirm("Remove this pro or con?")) return;
+
     startTransition(async () => {
       const result = await deleteProConAction(id, option.decision_id);
       toast({ title: result.message, tone: result.ok ? "success" : "error" });
@@ -418,8 +428,7 @@ function OptionCard({ option }: { option: OptionWithProsCons }) {
       </div>
 
       <form className="mt-4 grid gap-2 sm:grid-cols-[120px_minmax(0,1fr)_auto]" onSubmit={addItem}>
-        <select
-          className="h-10 rounded-md border border-ink/12 bg-white px-3 text-sm outline-none focus:border-moss focus:ring-2 focus:ring-moss/20"
+        <Select
           value={newItem.kind}
           onChange={(event) =>
             setNewItem((current) => ({
@@ -430,7 +439,7 @@ function OptionCard({ option }: { option: OptionWithProsCons }) {
         >
           <option value="pro">Pro</option>
           <option value="con">Con</option>
-        </select>
+        </Select>
         <Input
           required
           value={newItem.body}
@@ -475,6 +484,7 @@ function ProConList({
                 type="button"
                 className="text-ink/35 transition hover:text-coral"
                 aria-label="Remove"
+                title="Remove"
                 onClick={() => removeItem(item.id)}
               >
                 <Trash2 className="h-4 w-4" />

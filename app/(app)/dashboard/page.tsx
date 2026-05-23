@@ -20,6 +20,7 @@ import { formatDate, pluralize } from "@/lib/utils";
 
 export default async function DashboardPage() {
   const data = await getDashboardData();
+  const hasDemoData = data.decisions.some((decision) => decision.is_demo);
 
   return (
     <div className="space-y-6">
@@ -33,7 +34,7 @@ export default async function DashboardPage() {
           </h1>
         </div>
         <div className="flex flex-wrap gap-2">
-          <DemoDataButton />
+          <DemoDataButton hasDemoData={hasDemoData} />
           <Button asChild href="/decisions/new">
             <Plus className="h-4 w-4" />
             New decision
@@ -47,7 +48,7 @@ export default async function DashboardPage() {
           body="Start with one unresolved choice or load the judge demo set."
           action={
             <div className="flex flex-wrap justify-center gap-2">
-              <DemoDataButton />
+              <DemoDataButton hasDemoData={hasDemoData} />
               <Button asChild href="/decisions/new">
                 <Plus className="h-4 w-4" />
                 New decision

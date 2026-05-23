@@ -25,7 +25,7 @@ export function Input({
   return (
     <input
       className={cn(
-        "h-10 w-full rounded-md border border-ink/12 bg-white px-3 text-sm text-ink outline-none transition placeholder:text-ink/35 focus:border-moss focus:ring-2 focus:ring-moss/20",
+        "h-11 w-full min-w-0 rounded-md border border-ink/15 bg-white px-3 py-2 text-sm leading-5 text-ink shadow-sm outline-none transition placeholder:text-ink/35 focus:border-moss focus:ring-2 focus:ring-moss/20 disabled:cursor-not-allowed disabled:bg-ink/5 disabled:text-ink/45",
         className
       )}
       {...props}
@@ -40,7 +40,7 @@ export function Textarea({
   return (
     <textarea
       className={cn(
-        "min-h-24 w-full resize-y rounded-md border border-ink/12 bg-white px-3 py-2 text-sm text-ink outline-none transition placeholder:text-ink/35 focus:border-moss focus:ring-2 focus:ring-moss/20",
+        "min-h-28 w-full min-w-0 resize-y rounded-md border border-ink/15 bg-white px-3 py-2 text-sm leading-6 text-ink shadow-sm outline-none transition placeholder:text-ink/35 focus:border-moss focus:ring-2 focus:ring-moss/20 disabled:cursor-not-allowed disabled:bg-ink/5 disabled:text-ink/45",
         className
       )}
       {...props}
@@ -55,7 +55,7 @@ export function Select({
   return (
     <select
       className={cn(
-        "h-10 w-full rounded-md border border-ink/12 bg-white px-3 text-sm text-ink outline-none transition focus:border-moss focus:ring-2 focus:ring-moss/20",
+        "h-11 w-full min-w-0 rounded-md border border-ink/15 bg-white px-3 py-2 text-sm leading-5 text-ink shadow-sm outline-none transition focus:border-moss focus:ring-2 focus:ring-moss/20 disabled:cursor-not-allowed disabled:bg-ink/5 disabled:text-ink/45",
         className
       )}
       {...props}

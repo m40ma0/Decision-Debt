@@ -50,6 +50,13 @@ export function ResolutionPanel({
 
   function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (
+      action === "deleted" &&
+      !window.confirm("Mark this decision as deleted? It will move to history.")
+    ) {
+      return;
+    }
+
     startTransition(async () => {
       const payload =
         action === "committed"

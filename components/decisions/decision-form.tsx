@@ -82,7 +82,14 @@ export function DecisionForm({ decision }: { decision?: Decision }) {
 
       if (result.ok) {
         if (!decision && result.data?.id) {
-          router.push(`/decisions/${result.data.id}`);
+          const target = `/decisions/${result.data.id}`;
+          router.replace(target);
+          router.refresh();
+          window.setTimeout(() => {
+            if (window.location.pathname === "/decisions/new") {
+              window.location.assign(target);
+            }
+          }, 250);
         } else if (decision) {
           router.refresh();
         }

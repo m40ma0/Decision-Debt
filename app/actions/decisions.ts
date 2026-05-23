@@ -1,0 +1,417 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { z } from "zod";
+import type {
+  DecisionCategory,
+  DecisionStakes,
+  DecisionStatus,
+  Json,
+  ProConKind
+} from "@/lib/database.types";
+import { parseLines } from "@/lib/utils";
+import { requireUser } from "@/lib/auth";
+
+export type ActionResult<T = undefined> =
+  | { ok: true; message: string; data?: T }
+  | { ok: false; message: string; errors?: Record<string, string[]> };
+
+const emptyToNull = (value: unknown) =>
+  typeof value === "string" && value.trim() === "" ? null : value;
+
+const decisionSchema = z.object({
+  title: z.string().trim().min(2, "Title is too short.").max(160),
+  description: z.string().trim().optional().default(""),
+  category: z.enum([
+    "work",
+    "school",
+    "money",
+    "health",
+    "relationships",
+    "personal",
+    "other"
+  ]),
+  deadline: z.preprocess(emptyToNull, z.string().date().nullable().optional()),
+  reviewDate: z.preprocess(emptyToNull, z.string().date().nullable().optional()),
+  stakes: z.enum(["low", "medium", "high"]),
+  emotionalLoad: z.coerce.number().int().min(1).max(5),
+  timeImpact: z.coerce.number().int().min(1).max(5),
+  moneyImpact: z.coerce.number().int().min(1).max(5),
+  confidence: z.coerce.number().int().min(1).max(5),
+  blockers: z.string().optional().default(""),
+  missingInformation: z.string().optional().default(""),
+  nextAction: z.string().trim().optional().default(""),
+  outcomeNotes: z.string().trim().optional().default("")
+});
+
+const optionSchema = z.object({
+  title: z.string().trim().min(2, "Option title is too short.").max(160),
+  description: z.string().trim().optional().default("")
+});
+
+const proConSchema = z.object({
+  optionId: z.string().uuid(),
+  decisionId: z.string().uuid(),
+  kind: z.enum(["pro", "con"]),
+  body: z.string().trim().min(2, "Add a little more detail.").max(500)
+});
+
+const detailSchema = z.object({
+  missingInformation: z.string().optional().default(""),
+  nextAction: z.string().trim().optional().default(""),
+  outcomeNotes: z.string().trim().optional().default("")
+});
+
+const resolutionSchema = z.discriminatedUnion("action", [
+  z.object({
+    action: z.literal("committed"),
+    decisionId: z.string().uuid(),
+    optionId: z.string().uuid().optional(),
+    finalDecision: z.string().trim().min(2, "Final decision is required."),
+    reason: z.string().trim().min(2, "Reason is required."),
+    outcomeNotes: z.string().trim().optional().default("")
+  }),
+  z.object({
+    action: z.literal("deferred"),
+    decisionId: z.string().uuid(),
+    reviewDate: z.string().date("Set a review date."),
+    reason: z.string().trim().min(2, "Reason is required.")
+  }),
+  z.object({
+    action: z.literal("delegated"),
+    decisionId: z.string().uuid(),
+    delegatedTo: z.string().trim().min(2, "Owner is required."),
+    reviewDate: z.preprocess(emptyToNull, z.string().date().nullable().optional()),
+    reason: z.string().trim().min(2, "Reason is required.")
+  }),
+  z.object({
+    action: z.literal("deleted"),
+    decisionId: z.string().uuid(),
+    reason: z.string().trim().min(2, "Reason is required.")
+  })
+]);
+
+async function writeEvent(
+  decisionId: string,
+  eventType: string,
+  title: string,
+  body = "",
+  metadata: Json = {}
+) {
+  const { supabase, user } = await requireUser();
+  const { error } = await supabase.from("decision_events").insert({
+    decision_id: decisionId,
+    user_id: user.id,
+    event_type: eventType,
+    title,
+    body,
+    metadata
+  });
+  if (error) throw new Error(error.message);
+}
+
+function validationError(error: z.ZodError): ActionResult {
+  const fieldErrors = Object.fromEntries(
+    Object.entries(error.flatten().fieldErrors).filter(
+      (entry): entry is [string, string[]] => Array.isArray(entry[1])
+    )
+  );
+
+  return {
+    ok: false,
+    message: error.issues[0]?.message ?? "Check the form values.",
+    errors: fieldErrors
+  };
+}
+
+export async function createDecisionAction(
+  input: unknown
+): Promise<ActionResult<{ id: string }>> {
+  const parsed = decisionSchema.safeParse(input);
+  if (!parsed.success) return validationError(parsed.error);
+
+  const { supabase, user } = await requireUser();
+  const values = parsed.data;
+  const { data, error } = await supabase
+    .from("decisions")
+    .insert({
+      user_id: user.id,
+      title: values.title,
+      description: values.description,
+      category: values.category as DecisionCategory,
+      deadline: values.deadline ?? null,
+      review_date: values.reviewDate ?? null,
+      stakes: values.stakes as DecisionStakes,
+      emotional_load: values.emotionalLoad,
+      time_impact: values.timeImpact,
+      money_impact: values.moneyImpact,
+      confidence: values.confidence,
+      blockers: parseLines(values.blockers),
+      missing_information: parseLines(values.missingInformation),
+      next_action: values.nextAction,
+      outcome_notes: values.outcomeNotes
+    })
+    .select("id")
+    .single();
+
+  if (error) return { ok: false, message: error.message };
+  await writeEvent(data.id, "created", "Decision captured", values.description);
+  revalidatePath("/dashboard");
+  revalidatePath("/decisions");
+  return { ok: true, message: "Decision created.", data };
+}
+
+export async function updateDecisionAction(
+  id: string,
+  input: unknown
+): Promise<ActionResult> {
+  const parsed = decisionSchema.safeParse(input);
+  if (!parsed.success) return validationError(parsed.error);
+
+  const { supabase, user } = await requireUser();
+  const values = parsed.data;
+  const { error } = await supabase
+    .from("decisions")
+    .update({
+      title: values.title,
+      description: values.description,
+      category: values.category as DecisionCategory,
+      deadline: values.deadline ?? null,
+      review_date: values.reviewDate ?? null,
+      stakes: values.stakes as DecisionStakes,
+      emotional_load: values.emotionalLoad,
+      time_impact: values.timeImpact,
+      money_impact: values.moneyImpact,
+      confidence: values.confidence,
+      blockers: parseLines(values.blockers),
+      missing_information: parseLines(values.missingInformation),
+      next_action: values.nextAction,
+      outcome_notes: values.outcomeNotes
+    })
+    .eq("id", id)
+    .eq("user_id", user.id);
+
+  if (error) return { ok: false, message: error.message };
+  await writeEvent(id, "updated", "Decision updated");
+  revalidatePath("/dashboard");
+  revalidatePath("/decisions");
+  revalidatePath(`/decisions/${id}`);
+  return { ok: true, message: "Decision updated." };
+}
+
+export async function deleteDecisionAction(id: string): Promise<ActionResult> {
+  const { supabase, user } = await requireUser();
+  const { error } = await supabase
+    .from("decisions")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", user.id);
+
+  if (error) return { ok: false, message: error.message };
+  revalidatePath("/dashboard");
+  revalidatePath("/decisions");
+  return { ok: true, message: "Decision removed." };
+}
+
+export async function updateDecisionDetailAction(
+  id: string,
+  input: unknown
+): Promise<ActionResult> {
+  const parsed = detailSchema.safeParse(input);
+  if (!parsed.success) return validationError(parsed.error);
+
+  const { supabase, user } = await requireUser();
+  const { error } = await supabase
+    .from("decisions")
+    .update({
+      missing_information: parseLines(parsed.data.missingInformation),
+      next_action: parsed.data.nextAction,
+      outcome_notes: parsed.data.outcomeNotes
+    })
+    .eq("id", id)
+    .eq("user_id", user.id);
+
+  if (error) return { ok: false, message: error.message };
+  await writeEvent(id, "updated", "Decision notes updated");
+  revalidatePath(`/decisions/${id}`);
+  revalidatePath("/dashboard");
+  return { ok: true, message: "Decision notes saved." };
+}
+
+export async function addOptionAction(
+  decisionId: string,
+  input: unknown
+): Promise<ActionResult> {
+  const parsed = optionSchema.safeParse(input);
+  if (!parsed.success) return validationError(parsed.error);
+
+  const { supabase, user } = await requireUser();
+  const { error } = await supabase.from("decision_options").insert({
+    decision_id: decisionId,
+    user_id: user.id,
+    title: parsed.data.title,
+    description: parsed.data.description
+  });
+
+  if (error) return { ok: false, message: error.message };
+  await writeEvent(decisionId, "option_added", "Option added", parsed.data.title);
+  revalidatePath(`/decisions/${decisionId}`);
+  return { ok: true, message: "Option added." };
+}
+
+export async function updateOptionAction(
+  optionId: string,
+  decisionId: string,
+  input: unknown
+): Promise<ActionResult> {
+  const parsed = optionSchema.safeParse(input);
+  if (!parsed.success) return validationError(parsed.error);
+
+  const { supabase, user } = await requireUser();
+  const { error } = await supabase
+    .from("decision_options")
+    .update({
+      title: parsed.data.title,
+      description: parsed.data.description
+    })
+    .eq("id", optionId)
+    .eq("user_id", user.id);
+
+  if (error) return { ok: false, message: error.message };
+  await writeEvent(decisionId, "option_updated", "Option updated", parsed.data.title);
+  revalidatePath(`/decisions/${decisionId}`);
+  return { ok: true, message: "Option updated." };
+}
+
+export async function deleteOptionAction(
+  optionId: string,
+  decisionId: string
+): Promise<ActionResult> {
+  const { supabase, user } = await requireUser();
+  const { error } = await supabase
+    .from("decision_options")
+    .delete()
+    .eq("id", optionId)
+    .eq("user_id", user.id);
+
+  if (error) return { ok: false, message: error.message };
+  await writeEvent(decisionId, "option_deleted", "Option removed");
+  revalidatePath(`/decisions/${decisionId}`);
+  return { ok: true, message: "Option removed." };
+}
+
+export async function addProConAction(input: unknown): Promise<ActionResult> {
+  const parsed = proConSchema.safeParse(input);
+  if (!parsed.success) return validationError(parsed.error);
+
+  const { supabase, user } = await requireUser();
+  const { error } = await supabase.from("decision_option_pros_cons").insert({
+    option_id: parsed.data.optionId,
+    decision_id: parsed.data.decisionId,
+    user_id: user.id,
+    kind: parsed.data.kind as ProConKind,
+    body: parsed.data.body
+  });
+
+  if (error) return { ok: false, message: error.message };
+  await writeEvent(
+    parsed.data.decisionId,
+    `${parsed.data.kind}_added`,
+    `${parsed.data.kind === "pro" ? "Pro" : "Con"} added`,
+    parsed.data.body
+  );
+  revalidatePath(`/decisions/${parsed.data.decisionId}`);
+  return { ok: true, message: "Saved." };
+}
+
+export async function deleteProConAction(
+  id: string,
+  decisionId: string
+): Promise<ActionResult> {
+  const { supabase, user } = await requireUser();
+  const { error } = await supabase
+    .from("decision_option_pros_cons")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", user.id);
+
+  if (error) return { ok: false, message: error.message };
+  revalidatePath(`/decisions/${decisionId}`);
+  return { ok: true, message: "Removed." };
+}
+
+export async function resolveDecisionAction(input: unknown): Promise<ActionResult> {
+  const parsed = resolutionSchema.safeParse(input);
+  if (!parsed.success) return validationError(parsed.error);
+
+  const { supabase, user } = await requireUser();
+  const action = parsed.data.action as DecisionStatus;
+  const now = new Date().toISOString();
+  const update: Record<string, unknown> = {
+    status: action,
+    resolution_reason: "reason" in parsed.data ? parsed.data.reason : ""
+  };
+
+  if (parsed.data.action === "committed") {
+    update.final_decision = parsed.data.finalDecision;
+    update.outcome_notes = parsed.data.outcomeNotes;
+    update.resolved_at = now;
+  }
+
+  if (parsed.data.action === "deferred") {
+    update.review_date = parsed.data.reviewDate;
+    update.defer_reason = parsed.data.reason;
+    update.resolved_at = null;
+  }
+
+  if (parsed.data.action === "delegated") {
+    update.delegated_to = parsed.data.delegatedTo;
+    update.review_date = parsed.data.reviewDate ?? null;
+    update.resolved_at = now;
+  }
+
+  if (parsed.data.action === "deleted") {
+    update.resolved_at = now;
+  }
+
+  const { error } = await supabase
+    .from("decisions")
+    .update(update)
+    .eq("id", parsed.data.decisionId)
+    .eq("user_id", user.id);
+
+  if (error) return { ok: false, message: error.message };
+
+  if (parsed.data.action === "committed" && parsed.data.optionId) {
+    await supabase
+      .from("decision_options")
+      .update({ is_selected: false })
+      .eq("decision_id", parsed.data.decisionId)
+      .eq("user_id", user.id);
+    await supabase
+      .from("decision_options")
+      .update({ is_selected: true })
+      .eq("id", parsed.data.optionId)
+      .eq("user_id", user.id);
+  }
+
+  const eventTitle = {
+    committed: "Committed",
+    deferred: "Deferred",
+    delegated: "Delegated",
+    deleted: "Deleted"
+  }[parsed.data.action];
+
+  await writeEvent(
+    parsed.data.decisionId,
+    parsed.data.action,
+    eventTitle,
+    update.resolution_reason as string,
+    parsed.data as Json
+  );
+  revalidatePath("/dashboard");
+  revalidatePath("/decisions");
+  revalidatePath("/review");
+  revalidatePath(`/decisions/${parsed.data.decisionId}`);
+  return { ok: true, message: `${eventTitle}.` };
+}

@@ -5,10 +5,10 @@ export default function NewDecisionPage() {
     <div className="space-y-6">
       <div>
         <p className="text-sm font-semibold uppercase tracking-[0.18em] text-moss">
-          Capture
+          Create
         </p>
         <h1 className="mt-2 text-3xl font-semibold tracking-normal">
-          New decision
+          New Decision
         </h1>
       </div>
       <DecisionForm />

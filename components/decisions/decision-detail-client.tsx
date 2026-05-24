@@ -3,8 +3,10 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
+  Brain,
   Check,
   Circle,
+  Lightbulb,
   Info,
   Minus,
   Pencil,
@@ -17,11 +19,14 @@ import {
   addProConAction,
   deleteOptionAction,
   deleteProConAction,
+  updateGoodEnoughAction,
   updateDecisionDetailAction,
+  updateOutcomeLearningAction,
   updateOptionAction
 } from "@/app/actions/decisions";
 import { DebtBadge } from "@/components/debt-badge";
 import { ResolutionPanel } from "@/components/decisions/resolution-panel";
+import { TrapTags } from "@/components/trap-tags";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -40,6 +45,18 @@ export function DecisionDetailClient({ detail }: { detail: DecisionDetail }) {
     missingInformation: detail.decision.missing_information.join("\n"),
     nextAction: detail.decision.next_action,
     outcomeNotes: detail.decision.outcome_notes
+  });
+  const [goodEnough, setGoodEnough] = useState({
+    minimumInformation: detail.decision.minimum_information ?? "",
+    reversibleOption: detail.decision.reversible_option ?? "",
+    doNothingCost: detail.decision.do_nothing_cost ?? "",
+    fifteenMinuteAction: detail.decision.fifteen_minute_action ?? ""
+  });
+  const [outcome, setOutcome] = useState({
+    outcomeQuality: detail.decision.outcome_quality ?? "",
+    confidenceAfter: detail.decision.confidence_after?.toString() ?? "",
+    lessonLearned: detail.decision.lesson_learned ?? "",
+    outcomeNotes: detail.decision.outcome_notes ?? ""
   });
 
   function saveNotes(event: React.FormEvent<HTMLFormElement>) {
@@ -60,6 +77,28 @@ export function DecisionDetailClient({ detail }: { detail: DecisionDetail }) {
         setNewOption({ title: "", description: "" });
         router.refresh();
       }
+    });
+  }
+
+  function saveGoodEnough(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    startTransition(async () => {
+      const result = await updateGoodEnoughAction(detail.decision.id, goodEnough);
+      toast({ title: result.message, tone: result.ok ? "success" : "error" });
+      if (result.ok) router.refresh();
+    });
+  }
+
+  function saveOutcome(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    startTransition(async () => {
+      const result = await updateOutcomeLearningAction(detail.decision.id, {
+        ...outcome,
+        outcomeQuality: outcome.outcomeQuality || null,
+        confidenceAfter: outcome.confidenceAfter || null
+      });
+      toast({ title: result.message, tone: result.ok ? "success" : "error" });
+      if (result.ok) router.refresh();
     });
   }
 
@@ -86,8 +125,11 @@ export function DecisionDetailClient({ detail }: { detail: DecisionDetail }) {
                 <span>Deadline: {formatDate(detail.decision.deadline)}</span>
                 <span>Updated: {formatDateTime(detail.decision.updated_at)}</span>
               </div>
+              <div className="mt-4">
+                <TrapTags traps={detail.decision.traps} />
+              </div>
             </div>
-            <div className="rounded-lg border border-ink/10 bg-white p-4 lg:w-64">
+            <div className="rounded-lg border border-ink/10 bg-white p-4 lg:w-72">
               <div className="flex items-center justify-between gap-3">
                 <p className="text-sm font-semibold text-ink/60">Debt score</p>
                 <DebtBadge label={detail.decision.debt.label} />
@@ -103,6 +145,35 @@ export function DecisionDetailClient({ detail }: { detail: DecisionDetail }) {
                   </li>
                 ))}
               </ul>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border-moss/20 bg-mint/40">
+        <CardContent>
+          <div className="grid gap-4 md:grid-cols-[180px_minmax(0,1fr)]">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-[0.16em] text-moss">
+                Waiting Cost
+              </p>
+              <p className="mt-2 text-2xl font-semibold">
+                {detail.decision.debt.label}
+              </p>
+            </div>
+            <div className="grid gap-3 text-sm leading-6 text-ink/70 md:grid-cols-3">
+              <p>
+                <span className="font-semibold text-ink">Why:</span>{" "}
+                {detail.decision.costOfWaiting.why}
+              </p>
+              <p>
+                <span className="font-semibold text-ink">Risk:</span>{" "}
+                {detail.decision.costOfWaiting.whatGetsWorse}
+              </p>
+              <p>
+                <span className="font-semibold text-ink">Next:</span>{" "}
+                {detail.decision.costOfWaiting.nextAction}
+              </p>
             </div>
           </div>
         </CardContent>
@@ -135,17 +206,17 @@ export function DecisionDetailClient({ detail }: { detail: DecisionDetail }) {
                       description: event.target.value
                     }))
                   }
-                  placeholder="Short description"
+                  placeholder="Description"
                 />
                 <Button type="submit" disabled={pending}>
                   <Plus className="h-4 w-4" />
-                  Add
+                  Add Option
                 </Button>
               </form>
 
               {detail.options.length === 0 ? (
                 <div className="rounded-md border border-dashed border-ink/15 p-6 text-center text-sm text-ink/55">
-                  No options added.
+                  No options.
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -159,7 +230,7 @@ export function DecisionDetailClient({ detail }: { detail: DecisionDetail }) {
 
           <Card>
             <CardHeader>
-              <h2 className="text-lg font-semibold">Missing information and next action</h2>
+              <h2 className="text-lg font-semibold">Notes</h2>
             </CardHeader>
             <CardContent>
               <form className="space-y-4" onSubmit={saveNotes}>
@@ -191,7 +262,7 @@ export function DecisionDetailClient({ detail }: { detail: DecisionDetail }) {
                     }
                   />
                 </Field>
-                <Field label="Outcome notes" htmlFor="outcomeNotes">
+                <Field label="Outcome" htmlFor="outcomeNotes">
                   <Textarea
                     id="outcomeNotes"
                     value={notes.outcomeNotes}
@@ -206,7 +277,78 @@ export function DecisionDetailClient({ detail }: { detail: DecisionDetail }) {
                 <div className="flex justify-end">
                   <Button type="submit" disabled={pending}>
                     <Save className="h-4 w-4" />
-                    Save notes
+                    Save Notes
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <span className="grid h-9 w-9 place-items-center rounded-md bg-sky text-sky-900">
+                  <Brain className="h-4 w-4" />
+                </span>
+                <div>
+                  <h2 className="text-lg font-semibold">Good Enough</h2>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <form className="grid gap-4 lg:grid-cols-2" onSubmit={saveGoodEnough}>
+                <Field label="Minimum info" htmlFor="minimumInformation">
+                  <Textarea
+                    id="minimumInformation"
+                    value={goodEnough.minimumInformation}
+                    onChange={(event) =>
+                      setGoodEnough((current) => ({
+                        ...current,
+                        minimumInformation: event.target.value
+                      }))
+                    }
+                  />
+                </Field>
+                <Field label="Reversible option" htmlFor="reversibleOption">
+                  <Textarea
+                    id="reversibleOption"
+                    value={goodEnough.reversibleOption}
+                    onChange={(event) =>
+                      setGoodEnough((current) => ({
+                        ...current,
+                        reversibleOption: event.target.value
+                      }))
+                    }
+                  />
+                </Field>
+                <Field label="No-action cost" htmlFor="doNothingCost">
+                  <Textarea
+                    id="doNothingCost"
+                    value={goodEnough.doNothingCost}
+                    onChange={(event) =>
+                      setGoodEnough((current) => ({
+                        ...current,
+                        doNothingCost: event.target.value
+                      }))
+                    }
+                  />
+                </Field>
+                <Field label="15-minute action" htmlFor="fifteenMinuteAction">
+                  <Textarea
+                    id="fifteenMinuteAction"
+                    value={goodEnough.fifteenMinuteAction}
+                    onChange={(event) =>
+                      setGoodEnough((current) => ({
+                        ...current,
+                        fifteenMinuteAction: event.target.value
+                      }))
+                    }
+                  />
+                </Field>
+                <div className="flex justify-end lg:col-span-2">
+                  <Button type="submit" disabled={pending}>
+                    <Lightbulb className="h-4 w-4" />
+                    Save
                   </Button>
                 </div>
               </form>
@@ -248,13 +390,87 @@ export function DecisionDetailClient({ detail }: { detail: DecisionDetail }) {
             </Card>
           )}
 
+          {detail.decision.status !== "open" && detail.decision.status !== "deferred" ? (
+            <Card>
+              <CardHeader>
+                <h2 className="text-lg font-semibold">Outcome</h2>
+              </CardHeader>
+              <CardContent>
+                <form className="space-y-4" onSubmit={saveOutcome}>
+                  <Field label="Quality" htmlFor="outcomeQuality">
+                    <Select
+                      id="outcomeQuality"
+                      value={outcome.outcomeQuality}
+                      onChange={(event) =>
+                        setOutcome((current) => ({
+                          ...current,
+                          outcomeQuality: event.target.value
+                        }))
+                      }
+                    >
+                      <option value="">Not rated</option>
+                      <option value="good">Good</option>
+                      <option value="okay">Okay</option>
+                      <option value="bad">Bad</option>
+                    </Select>
+                  </Field>
+                  <Field label="Confidence after" htmlFor="confidenceAfter">
+                    <Input
+                      id="confidenceAfter"
+                      type="number"
+                      min={1}
+                      max={5}
+                      value={outcome.confidenceAfter}
+                      onChange={(event) =>
+                        setOutcome((current) => ({
+                          ...current,
+                          confidenceAfter: event.target.value
+                        }))
+                      }
+                    />
+                  </Field>
+                  <Field label="Lesson" htmlFor="lessonLearned">
+                    <Textarea
+                      id="lessonLearned"
+                      value={outcome.lessonLearned}
+                      onChange={(event) =>
+                        setOutcome((current) => ({
+                          ...current,
+                          lessonLearned: event.target.value
+                        }))
+                      }
+                    />
+                  </Field>
+                  <Field label="Notes" htmlFor="outcomeLearningNotes">
+                    <Textarea
+                      id="outcomeLearningNotes"
+                      value={outcome.outcomeNotes}
+                      onChange={(event) =>
+                        setOutcome((current) => ({
+                          ...current,
+                          outcomeNotes: event.target.value
+                        }))
+                      }
+                    />
+                  </Field>
+                  <div className="flex justify-end">
+                    <Button type="submit" disabled={pending}>
+                      <Save className="h-4 w-4" />
+                      Save
+                    </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+          ) : null}
+
           <Card>
             <CardHeader>
               <h2 className="text-lg font-semibold">History</h2>
             </CardHeader>
             <CardContent>
               {detail.events.length === 0 ? (
-                <p className="text-sm text-ink/55">No history yet.</p>
+                <p className="text-sm text-ink/55">No history.</p>
               ) : (
                 <ol className="space-y-4">
                   {detail.events.map((event) => (
@@ -311,7 +527,7 @@ function OptionCard({ option }: { option: OptionWithProsCons }) {
   function removeOption() {
     if (
       !window.confirm(
-        "Remove this option? Its pros and cons will be permanently deleted."
+        "Delete this option and its pros/cons?"
       )
     ) {
       return;
@@ -342,7 +558,7 @@ function OptionCard({ option }: { option: OptionWithProsCons }) {
   }
 
   function removeItem(id: string) {
-    if (!window.confirm("Remove this pro or con?")) return;
+    if (!window.confirm("Delete this pro/con?")) return;
 
     startTransition(async () => {
       const result = await deleteProConAction(id, option.decision_id);
@@ -400,23 +616,25 @@ function OptionCard({ option }: { option: OptionWithProsCons }) {
             <Button
               type="button"
               variant="ghost"
-              size="icon"
+              size="sm"
               aria-label="Edit option"
               title="Edit"
               onClick={() => setEditing(true)}
             >
               <Pencil className="h-4 w-4" />
+              Edit
             </Button>
             <Button
               type="button"
               variant="ghost"
-              size="icon"
-              aria-label="Remove option"
-              title="Remove"
+              size="sm"
+              aria-label="Delete option"
+              title="Delete"
               disabled={pending}
               onClick={removeOption}
             >
               <Trash2 className="h-4 w-4 text-coral" />
+              Delete
             </Button>
           </div>
         </div>
@@ -450,7 +668,7 @@ function OptionCard({ option }: { option: OptionWithProsCons }) {
         />
         <Button type="submit" disabled={pending}>
           <Plus className="h-4 w-4" />
-          Add
+          Add Item
         </Button>
       </form>
     </div>

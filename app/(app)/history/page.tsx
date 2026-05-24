@@ -13,18 +13,18 @@ export default async function HistoryPage() {
     <div className="space-y-6">
       <div>
         <p className="text-sm font-semibold uppercase tracking-[0.18em] text-moss">
-          Archive
+          History
         </p>
         <h1 className="mt-2 text-3xl font-semibold tracking-normal">History</h1>
       </div>
 
       <Card>
         <CardHeader>
-          <h2 className="text-lg font-semibold">Resolved decisions</h2>
+          <h2 className="text-lg font-semibold">Resolved</h2>
         </CardHeader>
         <CardContent>
           {resolved.length === 0 ? (
-            <p className="text-sm text-ink/55">No resolved decisions yet.</p>
+            <p className="text-sm text-ink/55">No resolved decisions.</p>
           ) : (
             <div className="space-y-3">
               {resolved.map((decision) => {

@@ -101,7 +101,7 @@ export function ResolutionPanel({
   return (
     <Card className={className}>
       <CardHeader>
-        <h2 className="text-lg font-semibold">Guided resolution</h2>
+        <h2 className="text-lg font-semibold">Resolve</h2>
       </CardHeader>
       <CardContent>
         <form className="space-y-5" onSubmit={submit}>
@@ -148,7 +148,7 @@ export function ResolutionPanel({
                   ))}
                 </Select>
               </Field>
-              <Field label="Final decision" htmlFor="finalDecision">
+              <Field label="Decision" htmlFor="finalDecision">
                 <Input
                   id="finalDecision"
                   required
@@ -167,7 +167,7 @@ export function ResolutionPanel({
                 </Field>
               </div>
               <div className="lg:col-span-2">
-                <Field label="Outcome notes" htmlFor="outcomeNotes">
+                <Field label="Outcome" htmlFor="outcomeNotes">
                   <Textarea
                     id="outcomeNotes"
                     value={form.outcomeNotes}

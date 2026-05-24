@@ -18,18 +18,18 @@ export default async function DecisionsPage() {
         </div>
         <Button asChild href="/decisions/new">
           <Plus className="h-4 w-4" />
-          New decision
+          New Decision
         </Button>
       </div>
 
       {decisions.length === 0 ? (
         <EmptyState
           title="Your inbox is empty"
-          body="Capture the choice that keeps coming back to mind."
+          body="Capture the next unresolved choice."
           action={
             <Button asChild href="/decisions/new">
               <Plus className="h-4 w-4" />
-              New decision
+              New Decision
             </Button>
           }
         />

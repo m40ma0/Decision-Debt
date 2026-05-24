@@ -60,19 +60,57 @@ export function DecisionForm({ decision }: { decision?: Decision }) {
   const { toast } = useToast();
   const [pending, startTransition] = useTransition();
   const [form, setForm] = useState<DecisionFormState>(() => decisionToState(decision));
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const isEditing = Boolean(decision);
 
-  const isValid = useMemo(() => form.title.trim().length >= 2, [form.title]);
+  const isValid = useMemo(
+    () => form.title.trim().length >= 1 && form.description.trim().length >= 1,
+    [form.description, form.title]
+  );
 
   function setField<K extends keyof DecisionFormState>(
     key: K,
     value: DecisionFormState[K]
   ) {
     setForm((current) => ({ ...current, [key]: value }));
+    setErrors((current) => {
+      const next = { ...current };
+      delete next[key];
+      return next;
+    });
+  }
+
+  function validateClient() {
+    const next: Record<string, string> = {};
+    if (!form.title.trim()) next.title = "Title is required.";
+    if (!form.description.trim()) next.description = "Description is required.";
+    for (const key of [
+      "emotionalLoad",
+      "timeImpact",
+      "moneyImpact",
+      "confidence"
+    ] as const) {
+      const value = Number(form[key]);
+      if (!Number.isInteger(value) || value < 1 || value > 5) {
+        next[key] = "Use a value from 1 to 5.";
+      }
+    }
+    if (form.deadline && Number.isNaN(Date.parse(form.deadline))) {
+      next.deadline = "Use a valid deadline.";
+    }
+    if (form.reviewDate && Number.isNaN(Date.parse(form.reviewDate))) {
+      next.reviewDate = "Use a valid review date.";
+    }
+    setErrors(next);
+    return Object.keys(next).length === 0;
   }
 
   function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!validateClient()) {
+      toast({ title: "Check the highlighted fields.", tone: "error" });
+      return;
+    }
     startTransition(async () => {
       const result = decision
         ? await updateDecisionAction(decision.id, form)
@@ -83,16 +121,19 @@ export function DecisionForm({ decision }: { decision?: Decision }) {
       if (result.ok) {
         if (!decision && result.data?.id) {
           const target = `/decisions/${result.data.id}`;
-          router.replace(target);
-          router.refresh();
-          window.setTimeout(() => {
-            if (window.location.pathname === "/decisions/new") {
-              window.location.assign(target);
-            }
-          }, 250);
+          window.location.assign(target);
         } else if (decision) {
           router.refresh();
         }
+      } else if (result.errors) {
+        setErrors(
+          Object.fromEntries(
+            Object.entries(result.errors).map(([key, messages]) => [
+              key,
+              messages[0] ?? "Check this field."
+            ])
+          )
+        );
       }
     });
   }
@@ -101,32 +142,35 @@ export function DecisionForm({ decision }: { decision?: Decision }) {
     <Card>
       <CardHeader>
         <h2 className="text-lg font-semibold">
-          {isEditing ? "Decision details" : "New decision"}
+          {isEditing ? "Edit Decision" : "New Decision"}
         </h2>
       </CardHeader>
       <CardContent>
         <form className="space-y-6" onSubmit={submit}>
           <div className="grid gap-4 lg:grid-cols-2">
             <div className="lg:col-span-2">
-              <Field label="Title" htmlFor="title">
+              <Field label="Title" htmlFor="title" error={errors.title}>
                 <Input
                   id="title"
                   required
+                  aria-invalid={Boolean(errors.title)}
                   value={form.title}
                   onChange={(event) => setField("title", event.target.value)}
                 />
               </Field>
             </div>
             <div className="lg:col-span-2">
-              <Field label="Description" htmlFor="description">
+              <Field label="Description" htmlFor="description" error={errors.description}>
                 <Textarea
                   id="description"
+                  required
+                  aria-invalid={Boolean(errors.description)}
                   value={form.description}
                   onChange={(event) => setField("description", event.target.value)}
                 />
               </Field>
             </div>
-            <Field label="Category" htmlFor="category">
+            <Field label="Category" htmlFor="category" error={errors.category}>
               <Select
                 id="category"
                 value={form.category}
@@ -139,7 +183,7 @@ export function DecisionForm({ decision }: { decision?: Decision }) {
                 ))}
               </Select>
             </Field>
-            <Field label="Stakes" htmlFor="stakes">
+            <Field label="Stakes" htmlFor="stakes" error={errors.stakes}>
               <Select
                 id="stakes"
                 value={form.stakes}
@@ -152,7 +196,12 @@ export function DecisionForm({ decision }: { decision?: Decision }) {
                 ))}
               </Select>
             </Field>
-            <Field label="Deadline" htmlFor="deadline">
+            <Field
+              label="Deadline"
+              htmlFor="deadline"
+              hint="Optional"
+              error={errors.deadline}
+            >
               <Input
                 id="deadline"
                 type="date"
@@ -160,7 +209,7 @@ export function DecisionForm({ decision }: { decision?: Decision }) {
                 onChange={(event) => setField("deadline", event.target.value)}
               />
             </Field>
-            <Field label="Review date" htmlFor="reviewDate">
+            <Field label="Review date" htmlFor="reviewDate" error={errors.reviewDate}>
               <Input
                 id="reviewDate"
                 type="date"
@@ -184,6 +233,7 @@ export function DecisionForm({ decision }: { decision?: Decision }) {
                   min={1}
                   max={5}
                   value={form[key as keyof DecisionFormState] as number}
+                  aria-invalid={Boolean(errors[key])}
                   onChange={(event) =>
                     setField(
                       key as keyof DecisionFormState,
@@ -191,6 +241,9 @@ export function DecisionForm({ decision }: { decision?: Decision }) {
                     )
                   }
                 />
+                {errors[key] ? (
+                  <p className="text-xs font-medium text-coral">{errors[key]}</p>
+                ) : null}
               </Field>
             ))}
           </div>
@@ -223,7 +276,7 @@ export function DecisionForm({ decision }: { decision?: Decision }) {
                 onChange={(event) => setField("nextAction", event.target.value)}
               />
             </Field>
-            <Field label="Outcome notes" htmlFor="outcomeNotes">
+            <Field label="Outcome" htmlFor="outcomeNotes">
               <Textarea
                 id="outcomeNotes"
                 value={form.outcomeNotes}
@@ -235,7 +288,7 @@ export function DecisionForm({ decision }: { decision?: Decision }) {
           <div className="flex justify-end">
             <Button type="submit" disabled={pending || !isValid}>
               <Save className="h-4 w-4" />
-              {pending ? "Saving" : "Save"}
+              {pending ? "Saving" : isEditing ? "Save Changes" : "Create Decision"}
             </Button>
           </div>
         </form>

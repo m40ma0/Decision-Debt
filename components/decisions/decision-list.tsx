@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { ArrowUpDown, Calendar, Search, Trash2 } from "lucide-react";
 import { deleteDecisionAction } from "@/app/actions/decisions";
 import { DebtBadge } from "@/components/debt-badge";
+import { TrapTags } from "@/components/trap-tags";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -69,7 +70,7 @@ export function DecisionList({ decisions }: { decisions: DecisionWithScore[] }) 
   function remove(id: string) {
     if (
       !window.confirm(
-        "Remove this decision? This permanently deletes its options and history."
+        "Delete this decision and its history?"
       )
     ) {
       return;
@@ -144,7 +145,7 @@ export function DecisionList({ decisions }: { decisions: DecisionWithScore[] }) 
           <span />
         </div>
         {filtered.length === 0 ? (
-          <div className="p-8 text-center text-sm text-ink/55">No matching decisions.</div>
+          <div className="p-8 text-center text-sm text-ink/55">No matches.</div>
         ) : (
           filtered.map((decision) => (
             <div
@@ -157,8 +158,11 @@ export function DecisionList({ decisions }: { decisions: DecisionWithScore[] }) 
                   <Badge tone="blue">{categoryLabels[decision.category]}</Badge>
                 </div>
                 <p className="mt-1 line-clamp-1 text-sm text-ink/55">
-                  {decision.description || decision.next_action || "No description"}
+                  {decision.description || decision.next_action || "No details"}
                 </p>
+                <div className="mt-2">
+                  <TrapTags traps={decision.traps} limit={3} compact />
+                </div>
               </Link>
               <Badge tone={decision.status === "open" ? "green" : "neutral"}>
                 {statusLabels[decision.status]}
@@ -175,13 +179,14 @@ export function DecisionList({ decisions }: { decisions: DecisionWithScore[] }) 
                 <Button
                   type="button"
                   variant="ghost"
-                  size="icon"
+                  size="sm"
                   aria-label="Remove decision"
-                  title="Remove"
+                  title="Delete"
                   disabled={pendingId === decision.id}
                   onClick={() => remove(decision.id)}
                 >
                   <Trash2 className="h-4 w-4 text-coral" />
+                  Delete
                 </Button>
               </div>
             </div>

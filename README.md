@@ -36,10 +36,11 @@ npm install
 
 2. Create a Supabase project.
 
-3. In the Supabase SQL editor, run:
+3. In the Supabase SQL editor, run both migrations in order:
 
 ```sql
 -- paste supabase/migrations/001_initial_schema.sql
+-- then paste supabase/migrations/002_product_polish.sql
 ```
 
 4. Copy the environment file:
@@ -113,4 +114,5 @@ npm run dev
 npm run build
 npm run lint
 npm run typecheck
+npm run test
 ```

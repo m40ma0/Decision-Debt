@@ -10,17 +10,17 @@ export default async function ReviewPage() {
     <div className="space-y-6">
       <div>
         <p className="text-sm font-semibold uppercase tracking-[0.18em] text-moss">
-          Weekly review
+          Review
         </p>
-        <h1 className="mt-2 text-3xl font-semibold tracking-normal">Review mode</h1>
+        <h1 className="mt-2 text-3xl font-semibold tracking-normal">Decision Review</h1>
       </div>
       {queue.length === 0 ? (
         <EmptyState
-          title="Nothing needs review"
-          body="Open decisions and due deferred decisions will appear here."
+          title="Review clear"
+          body="No open decisions need attention."
           action={
             <Button asChild href="/decisions/new">
-              New decision
+              New Decision
             </Button>
           }
         />

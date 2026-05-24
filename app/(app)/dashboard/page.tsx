@@ -11,6 +11,7 @@ import { DemoDataButton } from "@/components/demo-data-button";
 import { DebtBadge } from "@/components/debt-badge";
 import { EmptyState } from "@/components/empty-state";
 import { StatCard } from "@/components/dashboard/stat-card";
+import { TrapTags } from "@/components/trap-tags";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -20,7 +21,16 @@ import { formatDate, pluralize } from "@/lib/utils";
 
 export default async function DashboardPage() {
   const data = await getDashboardData();
-  const hasDemoData = data.decisions.some((decision) => decision.is_demo);
+  const hasDemoData =
+    data.decisions.filter((decision) => decision.is_demo).length >= 13;
+  const totalDebt = data.open.reduce((sum, decision) => sum + decision.debt.score, 0);
+  const topTrap = data.open
+    .flatMap((decision) => decision.traps)
+    .reduce<Record<string, number>>((acc, trap) => {
+      acc[trap.label] = (acc[trap.label] ?? 0) + 1;
+      return acc;
+    }, {});
+  const dominantTrap = Object.entries(topTrap).sort(([, a], [, b]) => b - a)[0];
 
   return (
     <div className="space-y-6">
@@ -37,7 +47,7 @@ export default async function DashboardPage() {
           <DemoDataButton hasDemoData={hasDemoData} />
           <Button asChild href="/decisions/new">
             <Plus className="h-4 w-4" />
-            New decision
+            New Decision
           </Button>
         </div>
       </div>
@@ -45,13 +55,13 @@ export default async function DashboardPage() {
       {data.decisions.length === 0 ? (
         <EmptyState
           title="No decisions yet"
-          body="Start with one unresolved choice or load the judge demo set."
+          body="Add one choice or load the demo."
           action={
             <div className="flex flex-wrap justify-center gap-2">
               <DemoDataButton hasDemoData={hasDemoData} />
               <Button asChild href="/decisions/new">
                 <Plus className="h-4 w-4" />
-                New decision
+                New Decision
               </Button>
             </div>
           }
@@ -78,29 +88,50 @@ export default async function DashboardPage() {
               tone="amber"
             />
             <StatCard
-              label="Average age"
-              value={pluralize(data.averageAge, "day")}
+              label="Total debt score"
+              value={totalDebt}
               icon={<Clock3 className="h-5 w-5" />}
             />
           </div>
+
+          <Card className="border-moss/20 bg-mint/35">
+            <CardContent>
+              <div className="grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)_220px] lg:items-center">
+                <div>
+                  <p className="text-sm font-semibold uppercase tracking-[0.16em] text-moss">
+                    Operating brief
+                  </p>
+                  <p className="mt-2 text-2xl font-semibold">
+                    {pluralize(data.averageAge, "day")} average age
+                  </p>
+                </div>
+                <p className="text-sm leading-6 text-ink/70">
+                  {dominantTrap
+                    ? `Top trap: ${dominantTrap[0].toLowerCase()}. Clear one blocker today.`
+                    : "Light load. Keep each decision moving."}
+                </p>
+                <Button asChild href="/review" variant="secondary">
+                  <TrendingDown className="h-4 w-4" />
+                  Review Now
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
 
           <div className="grid gap-6 xl:grid-cols-[minmax(0,1.5fr)_minmax(320px,0.8fr)]">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between gap-4">
                 <div>
-                  <h2 className="text-lg font-semibold">Top 3 today</h2>
-                  <p className="mt-1 text-sm text-ink/55">
-                    Highest active debt score
-                  </p>
+                  <h2 className="text-lg font-semibold">Resolve Today</h2>
                 </div>
                 <Button asChild href="/review" variant="outline" size="sm">
                   <TrendingDown className="h-4 w-4" />
-                  Review
+                  Review Now
                 </Button>
               </CardHeader>
               <CardContent className="space-y-3">
                 {data.topToday.length === 0 ? (
-                  <p className="text-sm text-ink/55">No open decisions.</p>
+                  <p className="text-sm text-ink/55">Nothing open.</p>
                 ) : (
                   data.topToday.map((decision, index) => (
                     <Link
@@ -123,6 +154,12 @@ export default async function DashboardPage() {
                             <Badge tone="blue">{categoryLabels[decision.category]}</Badge>
                             <Badge tone="neutral">{formatDate(decision.deadline)}</Badge>
                           </div>
+                          <div className="mt-3">
+                            <TrapTags traps={decision.traps} limit={3} compact />
+                          </div>
+                          <p className="mt-3 text-xs leading-5 text-ink/50">
+                            {decision.costOfWaiting.whatGetsWorse}
+                          </p>
                         </div>
                         <div className="flex items-center gap-2 sm:flex-col sm:items-end">
                           <p className="text-2xl font-semibold">{decision.debt.score}</p>
@@ -138,11 +175,11 @@ export default async function DashboardPage() {
             <div className="space-y-6">
               <Card>
                 <CardHeader>
-                  <h2 className="text-lg font-semibold">Category breakdown</h2>
+                  <h2 className="text-lg font-semibold">Categories</h2>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {Object.keys(data.categoryBreakdown).length === 0 ? (
-                    <p className="text-sm text-ink/55">No open categories.</p>
+                    <p className="text-sm text-ink/55">No categories.</p>
                   ) : (
                     Object.entries(data.categoryBreakdown).map(([category, count]) => (
                       <div key={category} className="flex items-center gap-3">
@@ -166,11 +203,11 @@ export default async function DashboardPage() {
 
               <Card>
                 <CardHeader>
-                  <h2 className="text-lg font-semibold">Recently resolved</h2>
+                  <h2 className="text-lg font-semibold">Resolved</h2>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {data.recentlyResolved.length === 0 ? (
-                    <p className="text-sm text-ink/55">Nothing resolved yet.</p>
+                    <p className="text-sm text-ink/55">None yet.</p>
                   ) : (
                     data.recentlyResolved.map((decision) => (
                       <Link

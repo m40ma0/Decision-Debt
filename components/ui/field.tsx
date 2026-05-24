@@ -67,18 +67,24 @@ export function Field({
   label,
   htmlFor,
   children,
-  hint
+  hint,
+  error
 }: {
   label: string;
   htmlFor?: string;
   children: React.ReactNode;
   hint?: string;
+  error?: string;
 }) {
   return (
     <div className="space-y-2">
       <Label htmlFor={htmlFor}>{label}</Label>
       {children}
-      {hint ? <p className="text-xs text-ink/50">{hint}</p> : null}
+      {error ? (
+        <p className="text-xs font-medium text-coral">{error}</p>
+      ) : hint ? (
+        <p className="text-xs text-ink/50">{hint}</p>
+      ) : null}
     </div>
   );
 }

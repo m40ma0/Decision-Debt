@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, ArrowRight, CheckCircle2, ExternalLink } from "lucide-react";
 import { DebtBadge } from "@/components/debt-badge";
 import { ResolutionPanel } from "@/components/decisions/resolution-panel";
+import { TrapTags } from "@/components/trap-tags";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -18,20 +19,21 @@ type ReviewItem = DecisionWithScore & {
 
 export function ReviewClient({ queue }: { queue: ReviewItem[] }) {
   const [index, setIndex] = useState(0);
+  const [completed, setCompleted] = useState(0);
   const current = queue[index];
 
   const progress = useMemo(() => {
     if (queue.length === 0) return 100;
-    return ((index + 1) / queue.length) * 100;
-  }, [index, queue.length]);
+    return (Math.max(completed, index + 1) / queue.length) * 100;
+  }, [completed, index, queue.length]);
 
-  if (!current) {
+  if (!current || completed >= queue.length) {
     return (
       <Card className="grid place-items-center px-6 py-16 text-center">
         <CheckCircle2 className="h-12 w-12 text-moss" />
-        <h2 className="mt-4 text-xl font-semibold">Review clear</h2>
+        <h2 className="mt-4 text-xl font-semibold">Review Complete</h2>
         <Button asChild href="/dashboard" className="mt-6">
-          Dashboard
+          Back to Dashboard
         </Button>
       </Card>
     );
@@ -48,7 +50,7 @@ export function ReviewClient({ queue }: { queue: ReviewItem[] }) {
         </div>
         <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm font-semibold">
-            {index + 1} of {queue.length}
+            {Math.min(index + 1, queue.length)} of {queue.length} · {completed} resolved this session
           </p>
           <div className="flex gap-2">
             <Button
@@ -95,6 +97,9 @@ export function ReviewClient({ queue }: { queue: ReviewItem[] }) {
                       {current.description}
                     </p>
                   ) : null}
+                  <div className="mt-4">
+                    <TrapTags traps={current.traps} />
+                  </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-3xl font-semibold">{current.debt.score}</span>
@@ -102,7 +107,14 @@ export function ReviewClient({ queue }: { queue: ReviewItem[] }) {
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="grid gap-4 md:grid-cols-2">
+            <CardContent className="space-y-4">
+              <div className="rounded-lg border border-moss/15 bg-mint/50 p-4">
+                <p className="text-sm font-semibold text-moss">Waiting Cost</p>
+                <p className="mt-2 text-sm leading-6 text-ink/70">
+                  {current.costOfWaiting.summary}
+                </p>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
               <div>
                 <p className="text-sm font-semibold text-ink/65">Blockers</p>
                 {current.blockers.length === 0 ? (
@@ -125,6 +137,17 @@ export function ReviewClient({ queue }: { queue: ReviewItem[] }) {
                   {current.next_action || "No next action set."}
                 </p>
               </div>
+              </div>
+              <div className="grid gap-3 md:grid-cols-2">
+                <p className="rounded-md bg-white p-3 text-sm leading-6 text-ink/65">
+                  <span className="font-semibold text-ink">Enough:</span>{" "}
+                  What fact unlocks action?
+                </p>
+                <p className="rounded-md bg-white p-3 text-sm leading-6 text-ink/65">
+                  <span className="font-semibold text-ink">No action:</span>{" "}
+                  What gets worse?
+                </p>
+              </div>
             </CardContent>
           </Card>
 
@@ -139,7 +162,7 @@ export function ReviewClient({ queue }: { queue: ReviewItem[] }) {
             <CardContent className="space-y-3">
               {current.options.length === 0 ? (
                 <p className="rounded-md border border-dashed border-ink/15 p-5 text-center text-sm text-ink/55">
-                  No options added.
+                  No options.
                 </p>
               ) : (
                 current.options.map((option) => (
@@ -180,7 +203,10 @@ export function ReviewClient({ queue }: { queue: ReviewItem[] }) {
         <ResolutionPanel
           decisionId={current.id}
           options={current.options}
-          onResolved={() => setIndex((value) => Math.min(queue.length - 1, value + 1))}
+          onResolved={() => {
+            setCompleted((value) => value + 1);
+            setIndex((value) => Math.min(queue.length - 1, value + 1));
+          }}
         />
       </div>
     </div>

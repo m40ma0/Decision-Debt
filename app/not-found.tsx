@@ -8,7 +8,7 @@ export default function NotFound() {
         <p className="text-sm font-semibold uppercase tracking-[0.18em] text-coral">
           Not found
         </p>
-        <h1 className="mt-3 text-3xl font-semibold">This decision is not available.</h1>
+        <h1 className="mt-3 text-3xl font-semibold">Page not found.</h1>
         <Button asChild href="/dashboard" className="mt-6">
           <ArrowLeft className="h-4 w-4" />
           Dashboard

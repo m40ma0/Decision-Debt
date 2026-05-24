@@ -24,6 +24,7 @@ export type DecisionStatus =
 
 export type DecisionStakes = "low" | "medium" | "high";
 export type ProConKind = "pro" | "con";
+export type OutcomeQuality = "good" | "okay" | "bad";
 
 export type Database = {
   public: {
@@ -73,6 +74,13 @@ export type Database = {
           outcome_notes: string;
           delegated_to: string;
           defer_reason: string;
+          minimum_information: string;
+          reversible_option: string;
+          do_nothing_cost: string;
+          fifteen_minute_action: string;
+          outcome_quality: OutcomeQuality | null;
+          confidence_after: number | null;
+          lesson_learned: string;
           is_demo: boolean;
           created_at: string;
           updated_at: string;
@@ -100,6 +108,13 @@ export type Database = {
           outcome_notes?: string;
           delegated_to?: string;
           defer_reason?: string;
+          minimum_information?: string;
+          reversible_option?: string;
+          do_nothing_cost?: string;
+          fifteen_minute_action?: string;
+          outcome_quality?: OutcomeQuality | null;
+          confidence_after?: number | null;
+          lesson_learned?: string;
           is_demo?: boolean;
           created_at?: string;
           updated_at?: string;
@@ -125,6 +140,13 @@ export type Database = {
           outcome_notes?: string;
           delegated_to?: string;
           defer_reason?: string;
+          minimum_information?: string;
+          reversible_option?: string;
+          do_nothing_cost?: string;
+          fifteen_minute_action?: string;
+          outcome_quality?: OutcomeQuality | null;
+          confidence_after?: number | null;
+          lesson_learned?: string;
           is_demo?: boolean;
           resolved_at?: string | null;
         };

@@ -8,9 +8,16 @@ import type {
 import { calculateDecisionDebtScore, type DebtScore } from "@/lib/scoring";
 import { daysBetween } from "@/lib/utils";
 import { requireUser } from "@/lib/auth";
+import {
+  detectDecisionTraps,
+  getCostOfWaiting,
+  type TrapTag
+} from "@/lib/decision-intelligence";
 
 export type DecisionWithScore = Decision & {
   debt: DebtScore;
+  traps: TrapTag[];
+  costOfWaiting: ReturnType<typeof getCostOfWaiting>;
 };
 
 export type OptionWithProsCons = DecisionOption & {
@@ -35,7 +42,9 @@ export async function getUserDecisions() {
   if (error) throw new Error(error.message);
   return (data ?? []).map((decision) => ({
     ...decision,
-    debt: calculateDecisionDebtScore(decision)
+    debt: calculateDecisionDebtScore(decision),
+    traps: detectDecisionTraps(decision),
+    costOfWaiting: getCostOfWaiting(decision)
   }));
 }
 
@@ -90,7 +99,9 @@ export async function getDecisionDetail(id: string): Promise<DecisionDetail> {
   return {
     decision: {
       ...decision,
-      debt: calculateDecisionDebtScore(decision)
+      debt: calculateDecisionDebtScore(decision),
+      traps: detectDecisionTraps(decision),
+      costOfWaiting: getCostOfWaiting(decision)
     },
     options: groupedOptions,
     events: events ?? []
@@ -218,10 +229,23 @@ export async function getReviewQueueDetails() {
 export async function getAnalyticsData() {
   const decisions = await getUserDecisions();
   const resolved = decisions.filter((decision) => decision.status !== "open");
+  const open = decisions.filter((decision) => decision.status === "open");
   const categoryCounts = decisions.reduce<Record<string, number>>((acc, decision) => {
     acc[decision.category] = (acc[decision.category] ?? 0) + 1;
     return acc;
   }, {});
+  const totalDebtScore = open.reduce((total, decision) => total + decision.debt.score, 0);
+  const today = new Date();
+  const averageAgeByCategory = open.reduce<Record<string, { total: number; count: number }>>(
+    (acc, decision) => {
+      const item = acc[decision.category] ?? { total: 0, count: 0 };
+      item.total += Math.max(0, daysBetween(new Date(decision.created_at), today));
+      item.count += 1;
+      acc[decision.category] = item;
+      return acc;
+    },
+    {}
+  );
   const blockerCounts = decisions
     .flatMap((decision) => decision.blockers)
     .reduce<Record<string, number>>((acc, blocker) => {
@@ -251,11 +275,64 @@ export async function getAnalyticsData() {
             resolutionDurations.length
         );
 
+  const statusCounts = decisions.reduce<Record<string, number>>((acc, decision) => {
+    acc[decision.status] = (acc[decision.status] ?? 0) + 1;
+    return acc;
+  }, {});
+
+  const trapCounts = open
+    .flatMap((decision) => decision.traps)
+    .reduce<Record<string, number>>((acc, trap) => {
+      acc[trap.label] = (acc[trap.label] ?? 0) + 1;
+      return acc;
+    }, {});
+
+  const categoryRisk = Object.entries(
+    open.reduce<Record<string, { total: number; count: number }>>((acc, decision) => {
+      const item = acc[decision.category] ?? { total: 0, count: 0 };
+      item.total += decision.debt.score;
+      item.count += 1;
+      acc[decision.category] = item;
+      return acc;
+    }, {})
+  )
+    .map(([category, value]) => ({
+      category,
+      averageDebt: Math.round(value.total / value.count),
+      count: value.count
+    }))
+    .sort((a, b) => b.averageDebt - a.averageDebt);
+
+  const highestRiskCategory = categoryRisk[0] ?? null;
+  const topTrap = Object.entries(trapCounts).sort(([, a], [, b]) => b - a)[0] ?? null;
+
+  const debtTrend = Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(today);
+    date.setDate(today.getDate() - (6 - index));
+    const label = date.toLocaleDateString("en", { month: "short", day: "numeric" });
+    const score = decisions.reduce((total, decision) => {
+      const created = new Date(decision.created_at);
+      const resolvedAt = decision.resolved_at ? new Date(decision.resolved_at) : null;
+      const existed = created <= date && (!resolvedAt || resolvedAt >= date);
+      return existed ? total + decision.debt.score : total;
+    }, 0);
+    return { label, score };
+  });
+
   return {
     decisions,
+    open,
     resolved,
     categoryCounts,
+    totalDebtScore,
+    averageAgeByCategory,
     blockerCounts,
+    statusCounts,
+    trapCounts,
+    categoryRisk,
+    highestRiskCategory,
+    topTrap,
+    debtTrend,
     resolutionDurations,
     averageResolutionDays
   };

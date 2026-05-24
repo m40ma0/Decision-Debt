@@ -7,10 +7,12 @@ import type {
   DecisionStakes,
   DecisionStatus,
   Json,
+  OutcomeQuality,
   ProConKind
 } from "@/lib/database.types";
 import { parseLines } from "@/lib/utils";
 import { requireUser } from "@/lib/auth";
+import { decisionFormSchema } from "@/lib/validation";
 
 export type ActionResult<T = undefined> =
   | { ok: true; message: string; data?: T }
@@ -18,31 +20,6 @@ export type ActionResult<T = undefined> =
 
 const emptyToNull = (value: unknown) =>
   typeof value === "string" && value.trim() === "" ? null : value;
-
-const decisionSchema = z.object({
-  title: z.string().trim().min(2, "Title is too short.").max(160),
-  description: z.string().trim().optional().default(""),
-  category: z.enum([
-    "work",
-    "school",
-    "money",
-    "health",
-    "relationships",
-    "personal",
-    "other"
-  ]),
-  deadline: z.preprocess(emptyToNull, z.string().date().nullable().optional()),
-  reviewDate: z.preprocess(emptyToNull, z.string().date().nullable().optional()),
-  stakes: z.enum(["low", "medium", "high"]),
-  emotionalLoad: z.coerce.number().int().min(1).max(5),
-  timeImpact: z.coerce.number().int().min(1).max(5),
-  moneyImpact: z.coerce.number().int().min(1).max(5),
-  confidence: z.coerce.number().int().min(1).max(5),
-  blockers: z.string().optional().default(""),
-  missingInformation: z.string().optional().default(""),
-  nextAction: z.string().trim().optional().default(""),
-  outcomeNotes: z.string().trim().optional().default("")
-});
 
 const optionSchema = z.object({
   title: z.string().trim().min(2, "Option title is too short.").max(160),
@@ -59,6 +36,23 @@ const proConSchema = z.object({
 const detailSchema = z.object({
   missingInformation: z.string().optional().default(""),
   nextAction: z.string().trim().optional().default(""),
+  outcomeNotes: z.string().trim().optional().default("")
+});
+
+const goodEnoughSchema = z.object({
+  minimumInformation: z.string().trim().optional().default(""),
+  reversibleOption: z.string().trim().optional().default(""),
+  doNothingCost: z.string().trim().optional().default(""),
+  fifteenMinuteAction: z.string().trim().optional().default("")
+});
+
+const outcomeLearningSchema = z.object({
+  outcomeQuality: z.enum(["good", "okay", "bad"]).nullable().optional(),
+  confidenceAfter: z.preprocess(
+    emptyToNull,
+    z.coerce.number().int().min(1, "Use 1-5.").max(5, "Use 1-5.").nullable().optional()
+  ),
+  lessonLearned: z.string().trim().optional().default(""),
   outcomeNotes: z.string().trim().optional().default("")
 });
 
@@ -127,7 +121,7 @@ function validationError(error: z.ZodError): ActionResult {
 export async function createDecisionAction(
   input: unknown
 ): Promise<ActionResult<{ id: string }>> {
-  const parsed = decisionSchema.safeParse(input);
+  const parsed = decisionFormSchema.safeParse(input);
   if (!parsed.success) return validationError(parsed.error);
 
   const { supabase, user } = await requireUser();
@@ -165,7 +159,7 @@ export async function updateDecisionAction(
   id: string,
   input: unknown
 ): Promise<ActionResult> {
-  const parsed = decisionSchema.safeParse(input);
+  const parsed = decisionFormSchema.safeParse(input);
   if (!parsed.success) return validationError(parsed.error);
 
   const { supabase, user } = await requireUser();
@@ -236,6 +230,66 @@ export async function updateDecisionDetailAction(
   revalidatePath(`/decisions/${id}`);
   revalidatePath("/dashboard");
   return { ok: true, message: "Decision notes saved." };
+}
+
+export async function updateGoodEnoughAction(
+  id: string,
+  input: unknown
+): Promise<ActionResult> {
+  const parsed = goodEnoughSchema.safeParse(input);
+  if (!parsed.success) return validationError(parsed.error);
+
+  const { supabase, user } = await requireUser();
+  const { error } = await supabase
+    .from("decisions")
+    .update({
+      minimum_information: parsed.data.minimumInformation,
+      reversible_option: parsed.data.reversibleOption,
+      do_nothing_cost: parsed.data.doNothingCost,
+      fifteen_minute_action: parsed.data.fifteenMinuteAction,
+      next_action: parsed.data.fifteenMinuteAction || undefined
+    })
+    .eq("id", id)
+    .eq("user_id", user.id);
+
+  if (error) return { ok: false, message: error.message };
+  await writeEvent(id, "good_enough_updated", "Good enough mode updated");
+  revalidatePath(`/decisions/${id}`);
+  revalidatePath("/dashboard");
+  revalidatePath("/review");
+  return { ok: true, message: "Good enough prompts saved." };
+}
+
+export async function updateOutcomeLearningAction(
+  id: string,
+  input: unknown
+): Promise<ActionResult> {
+  const parsed = outcomeLearningSchema.safeParse(input);
+  if (!parsed.success) return validationError(parsed.error);
+
+  const { supabase, user } = await requireUser();
+  const { error } = await supabase
+    .from("decisions")
+    .update({
+      outcome_quality: (parsed.data.outcomeQuality ?? null) as OutcomeQuality | null,
+      confidence_after: parsed.data.confidenceAfter ?? null,
+      lesson_learned: parsed.data.lessonLearned,
+      outcome_notes: parsed.data.outcomeNotes
+    })
+    .eq("id", id)
+    .eq("user_id", user.id);
+
+  if (error) return { ok: false, message: error.message };
+  await writeEvent(
+    id,
+    "outcome_learning_updated",
+    "Outcome updated",
+    parsed.data.lessonLearned
+  );
+  revalidatePath(`/decisions/${id}`);
+  revalidatePath("/analytics");
+  revalidatePath("/history");
+  return { ok: true, message: "Outcome saved." };
 }
 
 export async function addOptionAction(

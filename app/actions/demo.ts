@@ -25,6 +25,18 @@ type DemoDecision = {
   blockers: string[];
   missing_information: string[];
   next_action: string;
+  minimum_information?: string;
+  reversible_option?: string;
+  do_nothing_cost?: string;
+  fifteen_minute_action?: string;
+  status?: "open" | "committed" | "deferred" | "delegated" | "deleted";
+  final_decision?: string;
+  resolution_reason?: string;
+  outcome_notes?: string;
+  outcome_quality?: "good" | "okay" | "bad";
+  confidence_after?: number;
+  lesson_learned?: string;
+  resolved_at?: string;
   created_at: string;
   options: {
     title: string;
@@ -388,6 +400,47 @@ const demoDecisions: DemoDecision[] = [
         cons: ["Taste risk"]
       }
     ]
+  },
+  {
+    title: "Resolve the team meeting cadence",
+    description: "The weekly meeting was drifting, so the team needed a clearer operating rhythm.",
+    category: "work",
+    deadline: isoDate(-2),
+    stakes: "medium",
+    emotional_load: 2,
+    time_impact: 4,
+    money_impact: 1,
+    confidence: 4,
+    blockers: ["too many recurring meetings", "unclear decision owner"],
+    missing_information: ["Which updates actually need discussion?"],
+    next_action: "Pilot a shorter agenda for two weeks.",
+    minimum_information: "Whether async updates cover status sharing.",
+    reversible_option: "Try a two-week pilot before making it permanent.",
+    do_nothing_cost: "The team keeps losing focus time to vague meetings.",
+    fifteen_minute_action: "Draft the new 30-minute agenda and send it to the team.",
+    status: "committed",
+    final_decision: "Move to a 30-minute weekly decision meeting with async updates beforehand.",
+    resolution_reason: "The reversible pilot reduces meeting load without removing team alignment.",
+    outcome_notes: "The pilot cut meeting time and made decisions clearer.",
+    outcome_quality: "good",
+    confidence_after: 5,
+    lesson_learned: "A reversible pilot helped the team stop debating the perfect process.",
+    resolved_at: daysAgo(1),
+    created_at: daysAgo(19),
+    options: [
+      {
+        title: "Short weekly decision meeting",
+        description: "Keep one concise meeting focused only on decisions and blockers.",
+        pros: ["Preserves alignment", "Easy to test", "Cuts time waste"],
+        cons: ["Requires agenda discipline"]
+      },
+      {
+        title: "Fully async updates",
+        description: "Replace the meeting with written updates.",
+        pros: ["Maximum focus time", "Easy to document"],
+        cons: ["Harder to resolve disagreement quickly"]
+      }
+    ]
   }
 ];
 
@@ -427,7 +480,7 @@ export async function seedDemoDataAction() {
       ...decision,
       id: decisionId,
       user_id: user.id,
-      status: "open" as const,
+      status: decision.status ?? ("open" as const),
       is_demo: true
     });
 
@@ -439,6 +492,17 @@ export async function seedDemoDataAction() {
       body: demo.description,
       metadata: { isDemo: true }
     });
+
+    if (decision.status && decision.status !== "open") {
+      eventRows.push({
+        decision_id: decisionId,
+        user_id: user.id,
+        event_type: decision.status,
+        title: "Demo decision resolved",
+        body: decision.resolution_reason ?? "",
+        metadata: { isDemo: true, finalDecision: decision.final_decision ?? "" }
+      });
+    }
 
     for (const option of options) {
       const { pros, cons, ...optionPayload } = option;

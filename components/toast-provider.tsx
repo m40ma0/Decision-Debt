@@ -45,7 +45,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={contextValue}>
       {children}
-      <div className="fixed bottom-4 right-4 z-50 flex w-[calc(100%-2rem)] max-w-sm flex-col gap-2">
+      <div className="fixed left-3 right-3 top-16 z-50 flex max-w-none flex-col gap-2 sm:left-auto sm:right-4 sm:top-4 sm:w-[calc(100%-2rem)] sm:max-w-sm">
         {toasts.map((item) => {
           const Icon = item.tone === "success" ? CheckCircle2 : CircleAlert;
           return (

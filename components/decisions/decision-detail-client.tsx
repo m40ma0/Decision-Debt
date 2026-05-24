@@ -25,6 +25,7 @@ import {
   updateOptionAction
 } from "@/app/actions/decisions";
 import { DebtBadge } from "@/components/debt-badge";
+import { DecisionForm } from "@/components/decisions/decision-form";
 import { ResolutionPanel } from "@/components/decisions/resolution-panel";
 import { TrapTags } from "@/components/trap-tags";
 import { Badge } from "@/components/ui/badge";
@@ -34,7 +35,9 @@ import { Field, Input, Select, Textarea } from "@/components/ui/field";
 import { useToast } from "@/components/toast-provider";
 import { categoryLabels, stakesLabels, statusLabels } from "@/lib/constants";
 import type { DecisionDetail, OptionWithProsCons } from "@/lib/queries";
-import { formatDate, formatDateTime } from "@/lib/utils";
+import { cn, formatDate, formatDateTime } from "@/lib/utils";
+
+type DetailTab = "overview" | "options" | "unblock" | "resolve" | "edit" | "history";
 
 export function DecisionDetailClient({ detail }: { detail: DecisionDetail }) {
   const router = useRouter();
@@ -58,6 +61,38 @@ export function DecisionDetailClient({ detail }: { detail: DecisionDetail }) {
     lessonLearned: detail.decision.lesson_learned ?? "",
     outcomeNotes: detail.decision.outcome_notes ?? ""
   });
+  const [activeTab, setActiveTab] = useState<DetailTab>("overview");
+  const isActionable =
+    detail.decision.status === "open" || detail.decision.status === "deferred";
+  const isResolved = !isActionable;
+
+  const tabs: Array<{ id: DetailTab; label: string }> = [
+    { id: "overview", label: "Overview" },
+    { id: "options", label: "Options" },
+    { id: "unblock", label: "Unblock" },
+    { id: "resolve", label: "Resolve" },
+    { id: "edit", label: "Edit" },
+    { id: "history", label: "History" }
+  ];
+
+  const scoreContributors = [
+    { label: "Deadline", value: detail.decision.debt.drivers.deadline, max: 25 },
+    { label: "Age", value: detail.decision.debt.drivers.age, max: 15 },
+    { label: "Stakes", value: detail.decision.debt.drivers.stakes, max: 20 },
+    {
+      label: "Emotion",
+      value: detail.decision.debt.drivers.emotionalLoad,
+      max: 25
+    },
+    { label: "Time", value: detail.decision.debt.drivers.timeImpact, max: 20 },
+    { label: "Money", value: detail.decision.debt.drivers.moneyImpact, max: 15 },
+    {
+      label: "Confidence",
+      value: detail.decision.debt.drivers.confidence,
+      max: 25
+    },
+    { label: "Blockers", value: detail.decision.debt.drivers.blockers, max: 12 }
+  ];
 
   function saveNotes(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -103,7 +138,7 @@ export function DecisionDetailClient({ detail }: { detail: DecisionDetail }) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <Card>
         <CardContent>
           <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
@@ -113,7 +148,7 @@ export function DecisionDetailClient({ detail }: { detail: DecisionDetail }) {
                 <Badge tone="neutral">{statusLabels[detail.decision.status]}</Badge>
                 <Badge tone="amber">{stakesLabels[detail.decision.stakes]} stakes</Badge>
               </div>
-              <h1 className="mt-4 text-3xl font-semibold tracking-normal">
+              <h1 className="mt-4 text-2xl font-semibold tracking-normal sm:text-3xl">
                 {detail.decision.title}
               </h1>
               {detail.decision.description ? (
@@ -137,41 +172,7 @@ export function DecisionDetailClient({ detail }: { detail: DecisionDetail }) {
               <p className="mt-3 text-4xl font-semibold">
                 {detail.decision.debt.score}
               </p>
-              <ul className="mt-3 space-y-1 text-sm text-ink/60">
-                {detail.decision.debt.explanation.map((item) => (
-                  <li key={item} className="flex gap-2">
-                    <Info className="mt-0.5 h-4 w-4 shrink-0 text-moss" />
-                    <span>{item}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="border-moss/20 bg-mint/40">
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-[180px_minmax(0,1fr)]">
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.16em] text-moss">
-                Waiting Cost
-              </p>
-              <p className="mt-2 text-2xl font-semibold">
-                {detail.decision.debt.label}
-              </p>
-            </div>
-            <div className="grid gap-3 text-sm leading-6 text-ink/70 md:grid-cols-3">
-              <p>
-                <span className="font-semibold text-ink">Why:</span>{" "}
-                {detail.decision.costOfWaiting.why}
-              </p>
-              <p>
-                <span className="font-semibold text-ink">Risk:</span>{" "}
-                {detail.decision.costOfWaiting.whatGetsWorse}
-              </p>
-              <p>
-                <span className="font-semibold text-ink">Next:</span>{" "}
+              <p className="mt-2 text-sm leading-6 text-ink/60">
                 {detail.decision.costOfWaiting.nextAction}
               </p>
             </div>
@@ -179,8 +180,128 @@ export function DecisionDetailClient({ detail }: { detail: DecisionDetail }) {
         </CardContent>
       </Card>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(320px,0.9fr)]">
-        <div className="space-y-6">
+      <div
+        className="flex gap-2 overflow-x-auto rounded-lg border border-ink/10 bg-white p-1"
+        role="tablist"
+        aria-label="Decision sections"
+      >
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === tab.id}
+            className={cn(
+              "h-10 shrink-0 rounded-md px-3 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-moss/30",
+              activeTab === tab.id
+                ? "bg-ink text-white"
+                : "text-ink/60 hover:bg-ink/5 hover:text-ink"
+            )}
+            onClick={() => setActiveTab(tab.id)}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      <div role="tabpanel">
+        {activeTab === "overview" ? (
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+            <Card>
+              <CardHeader>
+                <h2 className="text-lg font-semibold">Why this score?</h2>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {scoreContributors.map((item) => (
+                  <div key={item.label} className="grid gap-2 sm:grid-cols-[120px_minmax(0,1fr)_48px] sm:items-center">
+                    <span className="text-sm font-medium text-ink/65">{item.label}</span>
+                    <div className="h-2 overflow-hidden rounded-full bg-ink/10">
+                      <div
+                        className="h-full rounded-full bg-moss"
+                        style={{
+                          width: `${Math.max(
+                            item.value === 0 ? 0 : 4,
+                            Math.min(100, Math.round((item.value / item.max) * 100))
+                          )}%`
+                        }}
+                      />
+                    </div>
+                    <span className="text-sm font-semibold text-ink/70">
+                      {item.value}
+                    </span>
+                  </div>
+                ))}
+                <ul className="space-y-2 border-t border-ink/10 pt-4 text-sm text-ink/65">
+                  {detail.decision.debt.explanation.map((item) => (
+                    <li key={item} className="flex gap-2">
+                      <Info className="mt-0.5 h-4 w-4 shrink-0 text-moss" />
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+
+            <Card className="border-moss/20 bg-mint/40">
+              <CardHeader>
+                <h2 className="text-lg font-semibold">Cost of Waiting</h2>
+              </CardHeader>
+              <CardContent className="space-y-4 text-sm leading-6 text-ink/70">
+                <p>
+                  <span className="font-semibold text-ink">Why:</span>{" "}
+                  {detail.decision.costOfWaiting.why}
+                </p>
+                <p>
+                  <span className="font-semibold text-ink">Risk:</span>{" "}
+                  {detail.decision.costOfWaiting.whatGetsWorse}
+                </p>
+                <p className="rounded-md bg-white/70 p-3">
+                  <span className="font-semibold text-ink">Do today:</span>{" "}
+                  {detail.decision.costOfWaiting.nextAction}
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="xl:col-span-2">
+              <CardContent>
+                <div className="grid gap-4 md:grid-cols-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-ink/45">
+                      Next action
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-ink/70">
+                      {detail.decision.fifteen_minute_action ||
+                        detail.decision.next_action ||
+                        "Add a 15-minute action in Unblock."}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-ink/45">
+                      Blockers
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-ink/70">
+                      {detail.decision.blockers.length > 0
+                        ? detail.decision.blockers.join(", ")
+                        : "No blockers logged."}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-ink/45">
+                      Missing info
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-ink/70">
+                      {detail.decision.missing_information.length > 0
+                        ? detail.decision.missing_information.join(", ")
+                        : "Nothing listed yet."}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        ) : null}
+
+        {activeTab === "options" ? (
           <Card>
             <CardHeader className="flex flex-row items-center justify-between gap-4">
               <h2 className="text-lg font-semibold">Options</h2>
@@ -189,6 +310,7 @@ export function DecisionDetailClient({ detail }: { detail: DecisionDetail }) {
               <form className="grid gap-3 lg:grid-cols-[1fr_1fr_auto]" onSubmit={addOption}>
                 <Input
                   required
+                  aria-label="Option title"
                   value={newOption.title}
                   onChange={(event) =>
                     setNewOption((current) => ({
@@ -199,6 +321,7 @@ export function DecisionDetailClient({ detail }: { detail: DecisionDetail }) {
                   placeholder="Option title"
                 />
                 <Input
+                  aria-label="Option description"
                   value={newOption.description}
                   onChange={(event) =>
                     setNewOption((current) => ({
@@ -216,7 +339,7 @@ export function DecisionDetailClient({ detail }: { detail: DecisionDetail }) {
 
               {detail.options.length === 0 ? (
                 <div className="rounded-md border border-dashed border-ink/15 p-6 text-center text-sm text-ink/55">
-                  No options.
+                  Add two or three realistic choices, then compare pros and cons.
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -227,228 +350,109 @@ export function DecisionDetailClient({ detail }: { detail: DecisionDetail }) {
               )}
             </CardContent>
           </Card>
+        ) : null}
 
-          <Card>
-            <CardHeader>
-              <h2 className="text-lg font-semibold">Notes</h2>
-            </CardHeader>
-            <CardContent>
-              <form className="space-y-4" onSubmit={saveNotes}>
-                <Field
-                  label="Missing information"
-                  htmlFor="missingInformation"
-                  hint="One per line"
-                >
-                  <Textarea
-                    id="missingInformation"
-                    value={notes.missingInformation}
-                    onChange={(event) =>
-                      setNotes((current) => ({
-                        ...current,
-                        missingInformation: event.target.value
-                      }))
-                    }
-                  />
-                </Field>
-                <Field label="Next action" htmlFor="nextAction">
-                  <Textarea
-                    id="nextAction"
-                    value={notes.nextAction}
-                    onChange={(event) =>
-                      setNotes((current) => ({
-                        ...current,
-                        nextAction: event.target.value
-                      }))
-                    }
-                  />
-                </Field>
-                <Field label="Outcome" htmlFor="outcomeNotes">
-                  <Textarea
-                    id="outcomeNotes"
-                    value={notes.outcomeNotes}
-                    onChange={(event) =>
-                      setNotes((current) => ({
-                        ...current,
-                        outcomeNotes: event.target.value
-                      }))
-                    }
-                  />
-                </Field>
-                <div className="flex justify-end">
-                  <Button type="submit" disabled={pending}>
-                    <Save className="h-4 w-4" />
-                    Save Notes
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-3">
-                <span className="grid h-9 w-9 place-items-center rounded-md bg-sky text-sky-900">
-                  <Brain className="h-4 w-4" />
-                </span>
-                <div>
-                  <h2 className="text-lg font-semibold">Good Enough</h2>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <form className="grid gap-4 lg:grid-cols-2" onSubmit={saveGoodEnough}>
-                <Field label="Minimum info" htmlFor="minimumInformation">
-                  <Textarea
-                    id="minimumInformation"
-                    value={goodEnough.minimumInformation}
-                    onChange={(event) =>
-                      setGoodEnough((current) => ({
-                        ...current,
-                        minimumInformation: event.target.value
-                      }))
-                    }
-                  />
-                </Field>
-                <Field label="Reversible option" htmlFor="reversibleOption">
-                  <Textarea
-                    id="reversibleOption"
-                    value={goodEnough.reversibleOption}
-                    onChange={(event) =>
-                      setGoodEnough((current) => ({
-                        ...current,
-                        reversibleOption: event.target.value
-                      }))
-                    }
-                  />
-                </Field>
-                <Field label="No-action cost" htmlFor="doNothingCost">
-                  <Textarea
-                    id="doNothingCost"
-                    value={goodEnough.doNothingCost}
-                    onChange={(event) =>
-                      setGoodEnough((current) => ({
-                        ...current,
-                        doNothingCost: event.target.value
-                      }))
-                    }
-                  />
-                </Field>
-                <Field label="15-minute action" htmlFor="fifteenMinuteAction">
-                  <Textarea
-                    id="fifteenMinuteAction"
-                    value={goodEnough.fifteenMinuteAction}
-                    onChange={(event) =>
-                      setGoodEnough((current) => ({
-                        ...current,
-                        fifteenMinuteAction: event.target.value
-                      }))
-                    }
-                  />
-                </Field>
-                <div className="flex justify-end lg:col-span-2">
-                  <Button type="submit" disabled={pending}>
-                    <Lightbulb className="h-4 w-4" />
-                    Save
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="space-y-6">
-          {detail.decision.status === "open" || detail.decision.status === "deferred" ? (
-            <ResolutionPanel
-              decisionId={detail.decision.id}
-              options={detail.options}
-            />
-          ) : (
+        {activeTab === "unblock" ? (
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
             <Card>
               <CardHeader>
-                <h2 className="text-lg font-semibold">Resolution</h2>
-              </CardHeader>
-              <CardContent className="space-y-3 text-sm text-ink/65">
-                {detail.decision.final_decision ? (
-                  <p>
-                    <span className="font-semibold text-ink">Decision:</span>{" "}
-                    {detail.decision.final_decision}
-                  </p>
-                ) : null}
-                {detail.decision.delegated_to ? (
-                  <p>
-                    <span className="font-semibold text-ink">Owner:</span>{" "}
-                    {detail.decision.delegated_to}
-                  </p>
-                ) : null}
-                {detail.decision.resolution_reason ? (
-                  <p>
-                    <span className="font-semibold text-ink">Reason:</span>{" "}
-                    {detail.decision.resolution_reason}
-                  </p>
-                ) : null}
-              </CardContent>
-            </Card>
-          )}
-
-          {detail.decision.status !== "open" && detail.decision.status !== "deferred" ? (
-            <Card>
-              <CardHeader>
-                <h2 className="text-lg font-semibold">Outcome</h2>
+                <div className="flex items-center gap-3">
+                  <span className="grid h-9 w-9 place-items-center rounded-md bg-sky text-sky-900">
+                    <Brain className="h-4 w-4" />
+                  </span>
+                  <h2 className="text-lg font-semibold">Unblock This Decision</h2>
+                </div>
               </CardHeader>
               <CardContent>
-                <form className="space-y-4" onSubmit={saveOutcome}>
-                  <Field label="Quality" htmlFor="outcomeQuality">
-                    <Select
-                      id="outcomeQuality"
-                      value={outcome.outcomeQuality}
+                <form className="grid gap-4 lg:grid-cols-2" onSubmit={saveGoodEnough}>
+                  <Field label="Missing fact" htmlFor="minimumInformation">
+                    <Textarea
+                      id="minimumInformation"
+                      value={goodEnough.minimumInformation}
                       onChange={(event) =>
-                        setOutcome((current) => ({
+                        setGoodEnough((current) => ({
                           ...current,
-                          outcomeQuality: event.target.value
-                        }))
-                      }
-                    >
-                      <option value="">Not rated</option>
-                      <option value="good">Good</option>
-                      <option value="okay">Okay</option>
-                      <option value="bad">Bad</option>
-                    </Select>
-                  </Field>
-                  <Field label="Confidence after" htmlFor="confidenceAfter">
-                    <Input
-                      id="confidenceAfter"
-                      type="number"
-                      min={1}
-                      max={5}
-                      value={outcome.confidenceAfter}
-                      onChange={(event) =>
-                        setOutcome((current) => ({
-                          ...current,
-                          confidenceAfter: event.target.value
+                          minimumInformation: event.target.value
                         }))
                       }
                     />
                   </Field>
-                  <Field label="Lesson" htmlFor="lessonLearned">
+                  <Field label="Reversible option" htmlFor="reversibleOption">
                     <Textarea
-                      id="lessonLearned"
-                      value={outcome.lessonLearned}
+                      id="reversibleOption"
+                      value={goodEnough.reversibleOption}
                       onChange={(event) =>
-                        setOutcome((current) => ({
+                        setGoodEnough((current) => ({
                           ...current,
-                          lessonLearned: event.target.value
+                          reversibleOption: event.target.value
                         }))
                       }
                     />
                   </Field>
-                  <Field label="Notes" htmlFor="outcomeLearningNotes">
+                  <Field label="If you do nothing" htmlFor="doNothingCost">
                     <Textarea
-                      id="outcomeLearningNotes"
-                      value={outcome.outcomeNotes}
+                      id="doNothingCost"
+                      value={goodEnough.doNothingCost}
                       onChange={(event) =>
-                        setOutcome((current) => ({
+                        setGoodEnough((current) => ({
                           ...current,
-                          outcomeNotes: event.target.value
+                          doNothingCost: event.target.value
+                        }))
+                      }
+                    />
+                  </Field>
+                  <Field label="15-minute next action" htmlFor="fifteenMinuteAction">
+                    <Textarea
+                      id="fifteenMinuteAction"
+                      value={goodEnough.fifteenMinuteAction}
+                      onChange={(event) =>
+                        setGoodEnough((current) => ({
+                          ...current,
+                          fifteenMinuteAction: event.target.value
+                        }))
+                      }
+                    />
+                  </Field>
+                  <div className="flex justify-end lg:col-span-2">
+                    <Button type="submit" disabled={pending}>
+                      <Lightbulb className="h-4 w-4" />
+                      Save Unblock Plan
+                    </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <h2 className="text-lg font-semibold">Notes</h2>
+              </CardHeader>
+              <CardContent>
+                <form className="space-y-4" onSubmit={saveNotes}>
+                  <Field
+                    label="Missing information"
+                    htmlFor="missingInformation"
+                    hint="One per line"
+                  >
+                    <Textarea
+                      id="missingInformation"
+                      value={notes.missingInformation}
+                      onChange={(event) =>
+                        setNotes((current) => ({
+                          ...current,
+                          missingInformation: event.target.value
+                        }))
+                      }
+                    />
+                  </Field>
+                  <Field label="Smallest next action" htmlFor="nextAction">
+                    <Textarea
+                      id="nextAction"
+                      value={notes.nextAction}
+                      onChange={(event) =>
+                        setNotes((current) => ({
+                          ...current,
+                          nextAction: event.target.value
                         }))
                       }
                     />
@@ -456,46 +460,180 @@ export function DecisionDetailClient({ detail }: { detail: DecisionDetail }) {
                   <div className="flex justify-end">
                     <Button type="submit" disabled={pending}>
                       <Save className="h-4 w-4" />
-                      Save
+                      Save Notes
                     </Button>
                   </div>
                 </form>
               </CardContent>
             </Card>
-          ) : null}
+          </div>
+        ) : null}
 
-          <Card>
-            <CardHeader>
-              <h2 className="text-lg font-semibold">History</h2>
-            </CardHeader>
-            <CardContent>
-              {detail.events.length === 0 ? (
-                <p className="text-sm text-ink/55">No history.</p>
-              ) : (
-                <ol className="space-y-4">
-                  {detail.events.map((event) => (
-                    <li key={event.id} className="flex gap-3">
-                      <span className="mt-1 grid h-6 w-6 shrink-0 place-items-center rounded-full bg-mint text-moss">
-                        <Circle className="h-2.5 w-2.5 fill-current" />
-                      </span>
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold">{event.title}</p>
-                        {event.body ? (
-                          <p className="mt-1 text-sm leading-6 text-ink/60">
-                            {event.body}
+        {activeTab === "resolve" ? (
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+            {isActionable ? (
+              <ResolutionPanel
+                decisionId={detail.decision.id}
+                options={detail.options}
+              />
+            ) : (
+              <Card>
+                <CardHeader>
+                  <h2 className="text-lg font-semibold">Resolution</h2>
+                </CardHeader>
+                <CardContent className="space-y-3 text-sm text-ink/65">
+                  {detail.decision.final_decision ? (
+                    <p>
+                      <span className="font-semibold text-ink">Decision:</span>{" "}
+                      {detail.decision.final_decision}
+                    </p>
+                  ) : null}
+                  {detail.decision.delegated_to ? (
+                    <p>
+                      <span className="font-semibold text-ink">Owner:</span>{" "}
+                      {detail.decision.delegated_to}
+                    </p>
+                  ) : null}
+                  {detail.decision.resolution_reason ? (
+                    <p>
+                      <span className="font-semibold text-ink">Reason:</span>{" "}
+                      {detail.decision.resolution_reason}
+                    </p>
+                  ) : null}
+                </CardContent>
+              </Card>
+            )}
+
+            <Card className="border-moss/20 bg-mint/35">
+              <CardHeader>
+                <h2 className="text-lg font-semibold">Before You Choose</h2>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm leading-6 text-ink/70">
+                <p>{detail.decision.costOfWaiting.why}</p>
+                <p>
+                  <span className="font-semibold text-ink">Smallest action:</span>{" "}
+                  {detail.decision.fifteen_minute_action ||
+                    detail.decision.next_action ||
+                    detail.decision.costOfWaiting.nextAction}
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        ) : null}
+
+        {activeTab === "edit" ? <DecisionForm decision={detail.decision} /> : null}
+
+        {activeTab === "history" ? (
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+            <Card>
+              <CardHeader>
+                <h2 className="text-lg font-semibold">History</h2>
+              </CardHeader>
+              <CardContent>
+                {detail.events.length === 0 ? (
+                  <p className="text-sm text-ink/55">
+                    History will appear after edits, options, and resolution actions.
+                  </p>
+                ) : (
+                  <ol className="space-y-4">
+                    {detail.events.map((event) => (
+                      <li key={event.id} className="flex gap-3">
+                        <span className="mt-1 grid h-6 w-6 shrink-0 place-items-center rounded-full bg-mint text-moss">
+                          <Circle className="h-2.5 w-2.5 fill-current" />
+                        </span>
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold">{event.title}</p>
+                          {event.body ? (
+                            <p className="mt-1 text-sm leading-6 text-ink/60">
+                              {event.body}
+                            </p>
+                          ) : null}
+                          <p className="mt-1 text-xs text-ink/45">
+                            {formatDateTime(event.created_at)}
                           </p>
-                        ) : null}
-                        <p className="mt-1 text-xs text-ink/45">
-                          {formatDateTime(event.created_at)}
-                        </p>
-                      </div>
-                    </li>
-                  ))}
-                </ol>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </CardContent>
+            </Card>
+
+            {isResolved ? (
+              <Card>
+                <CardHeader>
+                  <h2 className="text-lg font-semibold">Outcome Learning</h2>
+                </CardHeader>
+                <CardContent>
+                  <form className="space-y-4" onSubmit={saveOutcome}>
+                    <Field label="Quality" htmlFor="outcomeQuality">
+                      <Select
+                        id="outcomeQuality"
+                        value={outcome.outcomeQuality}
+                        onChange={(event) =>
+                          setOutcome((current) => ({
+                            ...current,
+                            outcomeQuality: event.target.value
+                          }))
+                        }
+                      >
+                        <option value="">Not rated</option>
+                        <option value="good">Good</option>
+                        <option value="okay">Okay</option>
+                        <option value="bad">Bad</option>
+                      </Select>
+                    </Field>
+                    <Field label="Confidence after" htmlFor="confidenceAfter">
+                      <Input
+                        id="confidenceAfter"
+                        type="number"
+                        min={1}
+                        max={5}
+                        value={outcome.confidenceAfter}
+                        onChange={(event) =>
+                          setOutcome((current) => ({
+                            ...current,
+                            confidenceAfter: event.target.value
+                          }))
+                        }
+                      />
+                    </Field>
+                    <Field label="Lesson" htmlFor="lessonLearned">
+                      <Textarea
+                        id="lessonLearned"
+                        value={outcome.lessonLearned}
+                        onChange={(event) =>
+                          setOutcome((current) => ({
+                            ...current,
+                            lessonLearned: event.target.value
+                          }))
+                        }
+                      />
+                    </Field>
+                    <Field label="Notes" htmlFor="outcomeLearningNotes">
+                      <Textarea
+                        id="outcomeLearningNotes"
+                        value={outcome.outcomeNotes}
+                        onChange={(event) =>
+                          setOutcome((current) => ({
+                            ...current,
+                            outcomeNotes: event.target.value
+                          }))
+                        }
+                      />
+                    </Field>
+                    <div className="flex justify-end">
+                      <Button type="submit" disabled={pending}>
+                        <Save className="h-4 w-4" />
+                        Save Outcome
+                      </Button>
+                    </div>
+                  </form>
+                </CardContent>
+              </Card>
+            ) : null}
+          </div>
+        ) : null}
       </div>
     </div>
   );
@@ -573,12 +711,14 @@ function OptionCard({ option }: { option: OptionWithProsCons }) {
         <form className="space-y-3" onSubmit={updateOption}>
           <Input
             required
+            aria-label="Option title"
             value={draft.title}
             onChange={(event) =>
               setDraft((current) => ({ ...current, title: event.target.value }))
             }
           />
           <Textarea
+            aria-label="Option description"
             value={draft.description}
             onChange={(event) =>
               setDraft((current) => ({
@@ -647,6 +787,7 @@ function OptionCard({ option }: { option: OptionWithProsCons }) {
 
       <form className="mt-4 grid gap-2 sm:grid-cols-[120px_minmax(0,1fr)_auto]" onSubmit={addItem}>
         <Select
+          aria-label="Pro or con"
           value={newItem.kind}
           onChange={(event) =>
             setNewItem((current) => ({
@@ -698,15 +839,17 @@ function ProConList({
             >
               <Minus className="mt-0.5 h-4 w-4 shrink-0 text-moss" />
               <span className="min-w-0 flex-1 text-ink/70">{item.body}</span>
-              <button
+              <Button
                 type="button"
-                className="text-ink/35 transition hover:text-coral"
-                aria-label="Remove"
-                title="Remove"
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-ink/40 hover:text-coral"
+                aria-label={`Delete ${label.toLowerCase()}`}
+                title={`Delete ${label.toLowerCase()}`}
                 onClick={() => removeItem(item.id)}
               >
                 <Trash2 className="h-4 w-4" />
-              </button>
+              </Button>
             </li>
           ))}
         </ul>

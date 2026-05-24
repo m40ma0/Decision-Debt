@@ -28,6 +28,12 @@ export default async function AnalyticsPage() {
   const trapEntries = Object.entries(data.trapCounts).sort(([, a], [, b]) => b - a);
   const statusEntries = Object.entries(data.statusCounts).sort(([, a], [, b]) => b - a);
   const trendMax = Math.max(1, ...data.debtTrend.map((item) => item.score));
+  const averageResolveValue =
+    data.resolutionDurations.length === 0
+      ? "No resolved data"
+      : data.averageResolutionDays === 0
+        ? "Same day"
+        : pluralize(data.averageResolutionDays, "day");
 
   return (
     <div className="space-y-6">
@@ -52,7 +58,7 @@ export default async function AnalyticsPage() {
         />
         <StatCard
           label="Average resolve time"
-          value={pluralize(data.averageResolutionDays, "day")}
+          value={averageResolveValue}
           icon={<Clock3 className="h-5 w-5" />}
           tone="amber"
         />
@@ -112,20 +118,57 @@ export default async function AnalyticsPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="flex h-44 items-end gap-2">
-              {data.debtTrend.map((item) => (
-                <div key={item.label} className="flex flex-1 flex-col items-center gap-2">
-                  <div
-                    className="w-full rounded-t bg-moss"
-                    style={{
-                      height: `${Math.max(6, (item.score / trendMax) * 150)}px`
-                    }}
-                    title={`${item.label}: ${item.score}`}
-                  />
-                  <span className="text-[11px] text-ink/45">{item.label}</span>
+            {data.decisions.length === 0 ? (
+              <div className="rounded-md border border-dashed border-ink/15 p-6 text-center">
+                <p className="text-sm font-medium text-ink/70">No trend yet.</p>
+                <Link
+                  href="/decisions/new"
+                  className="mt-3 inline-flex text-sm font-semibold text-moss hover:text-moss/80"
+                >
+                  Create Decision
+                </Link>
+              </div>
+            ) : (
+              <div className="grid grid-cols-[36px_minmax(0,1fr)] gap-3">
+                <div className="flex h-52 flex-col justify-between text-right text-[11px] text-ink/45">
+                  <span>{trendMax}</span>
+                  <span>{Math.round(trendMax / 2)}</span>
+                  <span>0</span>
                 </div>
-              ))}
-            </div>
+                <div className="relative h-52 border-b border-l border-ink/15">
+                  <div className="absolute inset-0 flex flex-col justify-between">
+                    <span className="border-t border-dashed border-ink/10" />
+                    <span className="border-t border-dashed border-ink/10" />
+                    <span className="border-t border-dashed border-ink/10" />
+                  </div>
+                  <div className="relative flex h-full items-end gap-2 px-2 pb-7">
+                    {data.debtTrend.map((item) => (
+                      <div
+                        key={item.label}
+                        className="group flex h-full flex-1 flex-col justify-end gap-2"
+                      >
+                        <span className="text-center text-[11px] font-semibold text-ink/60">
+                          {item.score}
+                        </span>
+                        <div
+                          className="w-full rounded-t bg-moss transition group-hover:bg-ink"
+                          style={{
+                            height: `${Math.max(6, (item.score / trendMax) * 150)}px`
+                          }}
+                          title={`${item.label}: ${item.score} debt points`}
+                        />
+                        <span className="text-center text-[10px] text-ink/45 sm:text-[11px]">
+                          {item.label}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <p className="col-span-2 text-xs text-ink/50">
+                  Total active debt points over the last 7 days.
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -224,9 +267,19 @@ export default async function AnalyticsPage() {
         <CardHeader>
           <h2 className="text-lg font-semibold">Outcomes</h2>
         </CardHeader>
-        <CardContent>
-          {outcomeEntries.length === 0 ? (
-            <p className="text-sm text-ink/55">No outcomes.</p>
+          <CardContent>
+            {outcomeEntries.length === 0 ? (
+            <div className="rounded-md border border-dashed border-ink/15 p-6 text-center">
+              <p className="text-sm font-medium text-ink/70">
+                Outcome learning appears after resolved decisions are reviewed.
+              </p>
+              <Link
+                href="/history"
+                className="mt-3 inline-flex text-sm font-semibold text-moss hover:text-moss/80"
+              >
+                Review History
+              </Link>
+            </div>
           ) : (
             <div className="space-y-3">
               {outcomeEntries.map((decision) => (

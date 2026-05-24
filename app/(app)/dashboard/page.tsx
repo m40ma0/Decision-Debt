@@ -45,10 +45,6 @@ export default async function DashboardPage() {
         </div>
         <div className="flex flex-wrap gap-2">
           <DemoDataButton hasDemoData={hasDemoData} />
-          <Button asChild href="/decisions/new">
-            <Plus className="h-4 w-4" />
-            New Decision
-          </Button>
         </div>
       </div>
 
@@ -207,7 +203,9 @@ export default async function DashboardPage() {
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {data.recentlyResolved.length === 0 ? (
-                    <p className="text-sm text-ink/55">None yet.</p>
+                    <p className="text-sm text-ink/55">
+                      Resolved decisions will appear here after review.
+                    </p>
                   ) : (
                     data.recentlyResolved.map((decision) => (
                       <Link

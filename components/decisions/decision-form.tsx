@@ -9,7 +9,7 @@ import {
 } from "@/app/actions/decisions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Field, Input, Select, Textarea } from "@/components/ui/field";
+import { Field, Input, Label, Select, Textarea } from "@/components/ui/field";
 import { useToast } from "@/components/toast-provider";
 import {
   categoryLabels,
@@ -36,6 +36,109 @@ type DecisionFormState = {
   outcomeNotes: string;
 };
 
+const decisionTemplates = [
+  {
+    id: "work",
+    label: "Work",
+    patch: {
+      title: "Prioritize a work initiative",
+      description: "Choose which work commitment deserves focus next.",
+      category: "work",
+      stakes: "high",
+      emotionalLoad: 3,
+      timeImpact: 4,
+      moneyImpact: 2,
+      confidence: 3,
+      missingInformation: "Expected effort\nSuccess criteria",
+      nextAction: "List the tradeoffs and ask one stakeholder for input."
+    }
+  },
+  {
+    id: "school",
+    label: "School",
+    patch: {
+      title: "Choose a school deadline strategy",
+      description: "Decide how to handle an assignment, exam, project, or course choice.",
+      category: "school",
+      stakes: "medium",
+      emotionalLoad: 3,
+      timeImpact: 4,
+      moneyImpact: 1,
+      confidence: 3,
+      missingInformation: "Deadline requirements\nGrading impact",
+      nextAction: "Write the next 15-minute study or planning action."
+    }
+  },
+  {
+    id: "money",
+    label: "Money",
+    patch: {
+      title: "Make a money decision",
+      description: "Compare the financial upside, downside, and risk of waiting.",
+      category: "money",
+      stakes: "high",
+      emotionalLoad: 4,
+      timeImpact: 3,
+      moneyImpact: 5,
+      confidence: 2,
+      missingInformation: "Total cost\nWorst-case downside",
+      nextAction: "Find the one number that would make this decision clearer."
+    }
+  },
+  {
+    id: "health",
+    label: "Health",
+    patch: {
+      title: "Choose a health next step",
+      description: "Decide what support, appointment, or habit change comes next.",
+      category: "health",
+      stakes: "high",
+      emotionalLoad: 4,
+      timeImpact: 3,
+      moneyImpact: 2,
+      confidence: 2,
+      missingInformation: "Professional advice\nAvailable appointment times",
+      nextAction: "Book or request the smallest next appointment/check-in."
+    }
+  },
+  {
+    id: "relationships",
+    label: "Relationships",
+    patch: {
+      title: "Handle a relationship choice",
+      description: "Clarify what to say, when to say it, and what outcome is acceptable.",
+      category: "relationships",
+      stakes: "medium",
+      emotionalLoad: 5,
+      timeImpact: 2,
+      moneyImpact: 1,
+      confidence: 2,
+      missingInformation: "Desired boundary\nTiming",
+      nextAction: "Draft the first sentence of the conversation."
+    }
+  },
+  {
+    id: "personal",
+    label: "Personal",
+    patch: {
+      title: "Choose a personal next step",
+      description: "Reduce an open personal decision to one small next action.",
+      category: "personal",
+      stakes: "medium",
+      emotionalLoad: 3,
+      timeImpact: 3,
+      moneyImpact: 1,
+      confidence: 3,
+      missingInformation: "What matters most\nReversible option",
+      nextAction: "Pick one reversible option to test this week."
+    }
+  }
+] satisfies Array<{
+  id: string;
+  label: string;
+  patch: Partial<DecisionFormState>;
+}>;
+
 function decisionToState(decision?: Decision): DecisionFormState {
   return {
     title: decision?.title ?? "",
@@ -60,6 +163,7 @@ export function DecisionForm({ decision }: { decision?: Decision }) {
   const { toast } = useToast();
   const [pending, startTransition] = useTransition();
   const [form, setForm] = useState<DecisionFormState>(() => decisionToState(decision));
+  const [templateId, setTemplateId] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const isEditing = Boolean(decision);
 
@@ -78,6 +182,22 @@ export function DecisionForm({ decision }: { decision?: Decision }) {
       delete next[key];
       return next;
     });
+  }
+
+  function applyTemplate(id: string) {
+    setTemplateId(id);
+    const template = decisionTemplates.find((item) => item.id === id);
+    if (!template) return;
+
+    setForm((current) => ({
+      ...current,
+      ...template.patch,
+      title: current.title.trim() ? current.title : template.patch.title ?? current.title,
+      description: current.description.trim()
+        ? current.description
+        : template.patch.description ?? current.description
+    }));
+    setErrors({});
   }
 
   function validateClient() {
@@ -147,6 +267,23 @@ export function DecisionForm({ decision }: { decision?: Decision }) {
       </CardHeader>
       <CardContent>
         <form className="space-y-6" onSubmit={submit}>
+          {!isEditing ? (
+            <Field label="Template" htmlFor="decisionTemplate" hint="Optional shortcut">
+              <Select
+                id="decisionTemplate"
+                value={templateId}
+                onChange={(event) => applyTemplate(event.target.value)}
+              >
+                <option value="">Start from a common decision</option>
+                {decisionTemplates.map((template) => (
+                  <option key={template.id} value={template.id}>
+                    {template.label}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          ) : null}
+
           <div className="grid gap-4 lg:grid-cols-2">
             <div className="lg:col-span-2">
               <Field label="Title" htmlFor="title" error={errors.title}>
@@ -220,32 +357,40 @@ export function DecisionForm({ decision }: { decision?: Decision }) {
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {[
-              ["emotionalLoad", "Emotional load"],
-              ["timeImpact", "Time impact"],
-              ["moneyImpact", "Money impact"],
-              ["confidence", "Confidence"]
-            ].map(([key, label]) => (
-              <Field key={key} label={label} htmlFor={key}>
-                <Input
-                  id={key}
-                  type="number"
-                  min={1}
-                  max={5}
-                  value={form[key as keyof DecisionFormState] as number}
-                  aria-invalid={Boolean(errors[key])}
-                  onChange={(event) =>
-                    setField(
-                      key as keyof DecisionFormState,
-                      Number(event.target.value) as never
-                    )
-                  }
-                />
-                {errors[key] ? (
-                  <p className="text-xs font-medium text-coral">{errors[key]}</p>
-                ) : null}
-              </Field>
-            ))}
+            <ScaleControl
+              id="emotionalLoad"
+              label="Emotional load"
+              value={form.emotionalLoad}
+              helper="How much headspace this is using."
+              error={errors.emotionalLoad}
+              onChange={(value) => setField("emotionalLoad", value)}
+            />
+            <ScaleControl
+              id="timeImpact"
+              label="Time impact"
+              value={form.timeImpact}
+              helper="How much time waiting is costing."
+              error={errors.timeImpact}
+              onChange={(value) => setField("timeImpact", value)}
+            />
+            <ScaleControl
+              id="moneyImpact"
+              label="Money impact"
+              value={form.moneyImpact}
+              helper="How much money is at stake."
+              error={errors.moneyImpact}
+              onChange={(value) => setField("moneyImpact", value)}
+            />
+            <ScaleControl
+              id="confidence"
+              label="Confidence"
+              value={form.confidence}
+              helper="How ready you feel to choose."
+              lowLabel="unclear"
+              highLabel="clear"
+              error={errors.confidence}
+              onChange={(value) => setField("confidence", value)}
+            />
           </div>
 
           <div className="grid gap-4 lg:grid-cols-2">
@@ -294,5 +439,60 @@ export function DecisionForm({ decision }: { decision?: Decision }) {
         </form>
       </CardContent>
     </Card>
+  );
+}
+
+function ScaleControl({
+  id,
+  label,
+  value,
+  helper,
+  lowLabel = "low",
+  highLabel = "high",
+  error,
+  onChange
+}: {
+  id: string;
+  label: string;
+  value: number;
+  helper: string;
+  lowLabel?: string;
+  highLabel?: string;
+  error?: string;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <div className="rounded-lg border border-ink/10 bg-white p-4 shadow-sm">
+      <div className="flex items-center justify-between gap-3">
+        <Label htmlFor={id}>{label}</Label>
+        <span className="rounded-full bg-mint px-2.5 py-1 text-xs font-semibold text-moss">
+          {value}/5
+        </span>
+      </div>
+      <input
+        id={id}
+        type="range"
+        min={1}
+        max={5}
+        step={1}
+        value={value}
+        aria-invalid={Boolean(error)}
+        aria-describedby={`${id}-hint${error ? ` ${id}-error` : ""}`}
+        className="mt-4 w-full accent-moss focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-moss/30"
+        onChange={(event) => onChange(Number(event.target.value))}
+      />
+      <div className="mt-1 flex justify-between text-[11px] uppercase tracking-[0.12em] text-ink/45">
+        <span>1 {lowLabel}</span>
+        <span>5 {highLabel}</span>
+      </div>
+      <p id={`${id}-hint`} className="mt-2 text-xs leading-5 text-ink/55">
+        {helper}
+      </p>
+      {error ? (
+        <p id={`${id}-error`} className="mt-2 text-xs font-medium text-coral">
+          {error}
+        </p>
+      ) : null}
+    </div>
   );
 }

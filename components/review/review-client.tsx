@@ -162,7 +162,7 @@ export function ReviewClient({ queue }: { queue: ReviewItem[] }) {
             <CardContent className="space-y-3">
               {current.options.length === 0 ? (
                 <p className="rounded-md border border-dashed border-ink/15 p-5 text-center text-sm text-ink/55">
-                  No options.
+                  Add options from the detail page when this decision needs comparison.
                 </p>
               ) : (
                 current.options.map((option) => (

@@ -235,6 +235,15 @@ export async function getAnalyticsData() {
     return acc;
   }, {});
   const totalDebtScore = open.reduce((total, decision) => total + decision.debt.score, 0);
+  const debtReduced = resolved.reduce(
+    (total, decision) =>
+      total +
+      calculateDecisionDebtScore({
+        ...decision,
+        status: "open"
+      }).score,
+    0
+  );
   const today = new Date();
   const averageAgeByCategory = open.reduce<Record<string, { total: number; count: number }>>(
     (acc, decision) => {
@@ -325,6 +334,7 @@ export async function getAnalyticsData() {
     resolved,
     categoryCounts,
     totalDebtScore,
+    debtReduced,
     averageAgeByCategory,
     blockerCounts,
     statusCounts,

@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Save } from "lucide-react";
+import { CheckCircle2, Loader2, Save } from "lucide-react";
 import {
   createDecisionAction,
   updateDecisionAction
@@ -162,6 +162,9 @@ export function DecisionForm({ decision }: { decision?: Decision }) {
   const router = useRouter();
   const { toast } = useToast();
   const [pending, startTransition] = useTransition();
+  const [submitState, setSubmitState] = useState<
+    "idle" | "submitting" | "created" | "saved" | "error"
+  >("idle");
   const [form, setForm] = useState<DecisionFormState>(() => decisionToState(decision));
   const [templateId, setTemplateId] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -171,6 +174,7 @@ export function DecisionForm({ decision }: { decision?: Decision }) {
     () => form.title.trim().length >= 1 && form.description.trim().length >= 1,
     [form.description, form.title]
   );
+  const isBusy = pending || submitState === "submitting" || submitState === "created";
 
   function setField<K extends keyof DecisionFormState>(
     key: K,
@@ -225,38 +229,65 @@ export function DecisionForm({ decision }: { decision?: Decision }) {
     return Object.keys(next).length === 0;
   }
 
-  function submit(event: React.FormEvent<HTMLFormElement>) {
+  async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (isBusy) return;
+
     if (!validateClient()) {
+      setSubmitState("error");
       toast({ title: "Check the highlighted fields.", tone: "error" });
       return;
     }
-    startTransition(async () => {
-      const result = decision
-        ? await updateDecisionAction(decision.id, form)
-        : await createDecisionAction(form);
 
-      toast({ title: result.message, tone: result.ok ? "success" : "error" });
+    setSubmitState("submitting");
+    const result = decision
+      ? await updateDecisionAction(decision.id, form)
+      : await createDecisionAction(form);
 
-      if (result.ok) {
-        if (!decision && result.data?.id) {
-          const target = `/decisions/${result.data.id}`;
-          window.location.assign(target);
-        } else if (decision) {
+    if (result.ok) {
+      if (!decision && result.data?.id) {
+        setSubmitState("created");
+        toast({ title: "Decision created.", tone: "success" });
+        router.push(`/decisions/${result.data.id}`);
+        return;
+      }
+
+      setSubmitState("saved");
+      toast({ title: result.message, tone: "success" });
+      startTransition(() => {
+        if (decision) {
           router.refresh();
         }
-      } else if (result.errors) {
-        setErrors(
-          Object.fromEntries(
-            Object.entries(result.errors).map(([key, messages]) => [
-              key,
-              messages[0] ?? "Check this field."
-            ])
-          )
-        );
-      }
-    });
+      });
+      window.setTimeout(() => setSubmitState("idle"), 1800);
+      return;
+    }
+
+    setSubmitState("error");
+    toast({ title: result.message, tone: "error" });
+    if (result.errors) {
+      setErrors(
+        Object.fromEntries(
+          Object.entries(result.errors).map(([key, messages]) => [
+            key,
+            messages[0] ?? "Check this field."
+          ])
+        )
+      );
+    }
   }
+
+  const submitCopy = isEditing
+    ? submitState === "submitting"
+      ? "Saving changes..."
+      : submitState === "saved"
+        ? "Changes saved"
+        : "Save Changes"
+    : submitState === "submitting"
+      ? "Creating decision..."
+      : submitState === "created"
+        ? "Decision created"
+        : "Create Decision";
 
   return (
     <Card>
@@ -267,6 +298,17 @@ export function DecisionForm({ decision }: { decision?: Decision }) {
       </CardHeader>
       <CardContent>
         <form className="space-y-6" onSubmit={submit}>
+          <p className="sr-only" aria-live="polite">
+            {submitState === "submitting"
+              ? isEditing
+                ? "Saving changes."
+                : "Creating decision."
+              : submitState === "created"
+                ? "Decision created. Opening detail page."
+                : submitState === "saved"
+                  ? "Changes saved."
+                  : ""}
+          </p>
           {!isEditing ? (
             <Field label="Template" htmlFor="decisionTemplate" hint="Optional shortcut">
               <Select
@@ -431,9 +473,15 @@ export function DecisionForm({ decision }: { decision?: Decision }) {
           </div>
 
           <div className="flex justify-end">
-            <Button type="submit" disabled={pending || !isValid}>
-              <Save className="h-4 w-4" />
-              {pending ? "Saving" : isEditing ? "Save Changes" : "Create Decision"}
+            <Button type="submit" disabled={isBusy || !isValid}>
+              {submitState === "submitting" || pending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : submitState === "created" || submitState === "saved" ? (
+                <CheckCircle2 className="h-4 w-4" />
+              ) : (
+                <Save className="h-4 w-4" />
+              )}
+              {submitCopy}
             </Button>
           </div>
         </form>
@@ -478,6 +526,7 @@ function ScaleControl({
         value={value}
         aria-invalid={Boolean(error)}
         aria-describedby={`${id}-hint${error ? ` ${id}-error` : ""}`}
+        aria-valuetext={`${value} out of 5`}
         className="mt-4 w-full accent-moss focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-moss/30"
         onChange={(event) => onChange(Number(event.target.value))}
       />

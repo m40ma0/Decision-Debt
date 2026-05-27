@@ -141,7 +141,9 @@ export default async function DashboardPage() {
                             <span className="grid h-6 w-6 place-items-center rounded bg-ink text-xs font-semibold text-white">
                               {index + 1}
                             </span>
-                            <h3 className="truncate font-semibold">{decision.title}</h3>
+                            <h3 className="min-w-0 break-words font-semibold sm:truncate">
+                              {decision.title}
+                            </h3>
                           </div>
                           <p className="mt-2 line-clamp-2 text-sm leading-6 text-ink/60">
                             {decision.description || decision.next_action}

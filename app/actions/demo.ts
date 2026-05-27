@@ -141,8 +141,8 @@ const demoDecisions: DemoDecision[] = [
     ]
   },
   {
-    title: "Commit to a thesis topic",
-    description: "Several topics are viable, but the advisor meeting needs a direction.",
+    title: "Choose the school project deadline plan",
+    description: "The project can still land well, but the scope and deadline need a clear reset.",
     category: "school",
     deadline: isoDate(8),
     stakes: "medium",
@@ -150,22 +150,22 @@ const demoDecisions: DemoDecision[] = [
     time_impact: 5,
     money_impact: 1,
     confidence: 3,
-    blockers: ["advisor feedback pending"],
-    missing_information: ["Dataset access", "Advisor preference"],
-    next_action: "Send advisor a two-option brief.",
+    blockers: ["advisor feedback pending", "scope still too broad"],
+    missing_information: ["Minimum viable deliverable", "Rubric weighting"],
+    next_action: "Send the advisor a two-scope plan and ask for a recommendation.",
     created_at: daysAgo(21),
     options: [
       {
-        title: "Decision fatigue research",
-        description: "Study how unresolved choices affect daily planning.",
-        pros: ["Matches interests", "Original angle"],
-        cons: ["Harder to measure"]
+        title: "Narrow the project scope",
+        description: "Ship a focused version with stronger analysis.",
+        pros: ["More realistic", "Better finish quality"],
+        cons: ["Cuts one interesting feature"]
       },
       {
-        title: "Calendar behavior analysis",
-        description: "Analyze scheduling patterns and productivity.",
-        pros: ["Cleaner dataset", "Easier scope"],
-        cons: ["Less distinctive"]
+        title: "Ask for a short extension",
+        description: "Protect the larger scope by moving the deadline.",
+        pros: ["Keeps ambition", "More research time"],
+        cons: ["May not be approved"]
       }
     ]
   },
@@ -199,8 +199,8 @@ const demoDecisions: DemoDecision[] = [
     ]
   },
   {
-    title: "Decide what laptop to buy",
-    description: "Current machine is slowing down during builds.",
+    title: "Choose the laptop upgrade budget",
+    description: "The current machine slows down important work, but the purchase needs a clear ceiling.",
     category: "money",
     deadline: isoDate(14),
     stakes: "medium",
@@ -208,19 +208,19 @@ const demoDecisions: DemoDecision[] = [
     time_impact: 4,
     money_impact: 4,
     confidence: 3,
-    blockers: ["budget approval", "model comparison"],
-    missing_information: ["Trade-in value", "Team hardware policy"],
-    next_action: "Get budget approval from finance.",
+    blockers: ["budget ceiling unclear", "model comparison"],
+    missing_information: ["Trade-in value", "Actual performance requirement"],
+    next_action: "Set a maximum budget and compare two models only.",
     created_at: daysAgo(15),
     options: [
       {
-        title: "Buy now",
-        description: "Replace the machine this week.",
+        title: "Buy the mid-tier model",
+        description: "Replace the machine this week without overspending.",
         pros: ["Immediate speed gain", "Less build friction"],
         cons: ["Higher upfront cost"]
       },
       {
-        title: "Wait for next refresh",
+        title: "Wait for the next refresh",
         description: "Keep current setup until the next hardware cycle.",
         pros: ["May get better specs", "More budget clarity"],
         cons: ["Lost time continues"]
@@ -257,8 +257,8 @@ const demoDecisions: DemoDecision[] = [
     ]
   },
   {
-    title: "Pick the customer interview segment",
-    description: "The team can only recruit one segment before the sprint review.",
+    title: "Choose which internship path to pursue",
+    description: "Two opportunities are realistic, but applications and outreach need focus this week.",
     category: "work",
     deadline: isoDate(4),
     stakes: "high",
@@ -266,22 +266,22 @@ const demoDecisions: DemoDecision[] = [
     time_impact: 4,
     money_impact: 3,
     confidence: 2,
-    blockers: ["sample size small", "sales has conflicting input"],
-    missing_information: ["Highest churn segment", "Recruiting feasibility"],
-    next_action: "Ask sales ops for churn by segment.",
+    blockers: ["portfolio needs tailoring", "mentor advice pending"],
+    missing_information: ["Interview timeline", "Which role fits long-term goals"],
+    next_action: "Ask one mentor to compare the two paths by tomorrow.",
     created_at: daysAgo(17),
     options: [
       {
-        title: "Interview new managers",
-        description: "Focus on people making first purchase decisions.",
-        pros: ["High buying signal", "Fresh pain points"],
-        cons: ["Harder to recruit"]
+        title: "Apply for product design internships",
+        description: "Lean into research, prototyping, and portfolio storytelling.",
+        pros: ["Matches Design4Future work", "Strong portfolio fit"],
+        cons: ["More competitive"]
       },
       {
-        title: "Interview power users",
-        description: "Learn from existing heavy usage patterns.",
-        pros: ["Easy access", "Rich workflows"],
-        cons: ["May miss acquisition friction"]
+        title: "Apply for product operations internships",
+        description: "Build execution experience closer to teams and metrics.",
+        pros: ["Practical skills", "Broader openings"],
+        cons: ["Less design depth"]
       }
     ]
   },

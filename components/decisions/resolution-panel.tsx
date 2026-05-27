@@ -113,9 +113,10 @@ export function ResolutionPanel({
                 <button
                   key={item.value}
                   type="button"
+                  aria-pressed={active}
                   onClick={() => setAction(item.value)}
                   className={cn(
-                    "flex h-16 flex-col items-center justify-center gap-1 rounded-md border text-sm font-semibold transition",
+                    "flex h-16 flex-col items-center justify-center gap-1 rounded-md border text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-moss/30",
                     active
                       ? "border-ink bg-ink text-white"
                       : "border-ink/10 bg-white text-ink/70 hover:border-moss/30 hover:text-ink"

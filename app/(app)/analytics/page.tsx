@@ -1,9 +1,7 @@
 import Link from "next/link";
 import {
   AlertTriangle,
-  BarChart3,
   Clock3,
-  Layers3,
   ListChecks,
   TrendingUp
 } from "lucide-react";
@@ -30,10 +28,14 @@ export default async function AnalyticsPage() {
   const trendMax = Math.max(1, ...data.debtTrend.map((item) => item.score));
   const averageResolveValue =
     data.resolutionDurations.length === 0
-      ? "No resolved data"
+      ? "—"
       : data.averageResolutionDays === 0
         ? "Same day"
         : pluralize(data.averageResolutionDays, "day");
+  const topBlocker = blockerEntries[0] ?? null;
+  const fastestWin = [...data.open].sort(
+    (a, b) => a.blockers.length - b.blockers.length || b.debt.score - a.debt.score
+  )[0];
 
   return (
     <div className="space-y-6">
@@ -52,9 +54,10 @@ export default async function AnalyticsPage() {
           tone="green"
         />
         <StatCard
-          label="Open decisions"
-          value={data.open.length}
-          icon={<Layers3 className="h-5 w-5" />}
+          label="Debt reduced"
+          value={data.debtReduced}
+          icon={<TrendingUp className="h-5 w-5" />}
+          tone="green"
         />
         <StatCard
           label="Average resolve time"
@@ -77,7 +80,7 @@ export default async function AnalyticsPage() {
       <div className="grid gap-4 xl:grid-cols-3">
         <Card className="border-moss/20 bg-mint/35">
           <CardContent>
-            <p className="text-sm font-semibold text-moss">Insight</p>
+            <p className="text-sm font-semibold text-moss">Highest debt category</p>
             <p className="mt-2 text-sm leading-6 text-ink/70">
               {data.highestRiskCategory
                 ? `${categoryLabels[data.highestRiskCategory.category as keyof typeof categoryLabels]} carries the most debt.`
@@ -87,23 +90,19 @@ export default async function AnalyticsPage() {
         </Card>
         <Card>
           <CardContent>
-            <p className="text-sm font-semibold text-ink/65">Top trap</p>
+            <p className="text-sm font-semibold text-ink/65">Top recurring blocker</p>
             <p className="mt-2 text-sm leading-6 text-ink/70">
-              {data.topTrap
-                ? `${data.topTrap[0]} · ${data.topTrap[1]}`
-                : "None"}
+              {topBlocker ? `${topBlocker[0]} · ${topBlocker[1]}` : "No blockers yet."}
             </p>
           </CardContent>
         </Card>
         <Card>
           <CardContent>
-            <p className="text-sm font-semibold text-ink/65">Status mix</p>
+            <p className="text-sm font-semibold text-ink/65">Fastest win today</p>
             <p className="mt-2 text-sm leading-6 text-ink/70">
-              {statusEntries.length === 0
-                ? "No data"
-                : statusEntries
-                    .map(([status, count]) => `${statusLabels[status as keyof typeof statusLabels]} ${count}`)
-                    .join(" · ")}
+              {fastestWin
+                ? `${fastestWin.title} · ${fastestWin.costOfWaiting.nextAction}`
+                : "Create one decision to get a recommendation."}
             </p>
           </CardContent>
         </Card>
@@ -129,7 +128,10 @@ export default async function AnalyticsPage() {
                 </Link>
               </div>
             ) : (
-              <div className="grid grid-cols-[36px_minmax(0,1fr)] gap-3">
+              <div className="grid grid-cols-[42px_minmax(0,1fr)] gap-3">
+                <p className="col-span-2 text-xs font-semibold uppercase tracking-[0.12em] text-ink/45">
+                  Debt points
+                </p>
                 <div className="flex h-52 flex-col justify-between text-right text-[11px] text-ink/45">
                   <span>{trendMax}</span>
                   <span>{Math.round(trendMax / 2)}</span>
@@ -151,11 +153,12 @@ export default async function AnalyticsPage() {
                           {item.score}
                         </span>
                         <div
-                          className="w-full rounded-t bg-moss transition group-hover:bg-ink"
+                          className="w-full rounded-t bg-moss transition group-hover:bg-ink group-focus-within:bg-ink"
                           style={{
                             height: `${Math.max(6, (item.score / trendMax) * 150)}px`
                           }}
                           title={`${item.label}: ${item.score} debt points`}
+                          aria-label={`${item.label}: ${item.score} debt points`}
                         />
                         <span className="text-center text-[10px] text-ink/45 sm:text-[11px]">
                           {item.label}
@@ -165,7 +168,7 @@ export default async function AnalyticsPage() {
                   </div>
                 </div>
                 <p className="col-span-2 text-xs text-ink/50">
-                  Total active debt points over the last 7 days.
+                  Last 7 days. Resolved decisions reduce future active debt.
                 </p>
               </div>
             )}
@@ -264,6 +267,37 @@ export default async function AnalyticsPage() {
       </div>
 
       <Card>
+        <CardContent>
+          <div className="grid gap-4 md:grid-cols-3">
+            <div>
+              <p className="text-sm font-semibold text-ink/65">Status mix</p>
+              <p className="mt-2 text-sm leading-6 text-ink/70">
+                {statusEntries.length === 0
+                  ? "No data"
+                  : statusEntries
+                      .map(([status, count]) => `${statusLabels[status as keyof typeof statusLabels]} ${count}`)
+                      .join(" · ")}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-ink/65">Top trap</p>
+              <p className="mt-2 text-sm leading-6 text-ink/70">
+                {data.topTrap ? `${data.topTrap[0]} · ${data.topTrap[1]}` : "No traps yet."}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-ink/65">Resolve timing</p>
+              <p className="mt-2 text-sm leading-6 text-ink/70">
+                {data.resolutionDurations.length === 0
+                  ? "Resolve a decision to unlock timing analytics."
+                  : `${data.resolutionDurations.length} resolved decision${data.resolutionDurations.length === 1 ? "" : "s"} measured.`}
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
         <CardHeader>
           <h2 className="text-lg font-semibold">Outcomes</h2>
         </CardHeader>
@@ -271,13 +305,13 @@ export default async function AnalyticsPage() {
             {outcomeEntries.length === 0 ? (
             <div className="rounded-md border border-dashed border-ink/15 p-6 text-center">
               <p className="text-sm font-medium text-ink/70">
-                Outcome learning appears after resolved decisions are reviewed.
+                Resolve a decision to unlock outcome analytics.
               </p>
               <Link
-                href="/history"
+                href="/review"
                 className="mt-3 inline-flex text-sm font-semibold text-moss hover:text-moss/80"
               >
-                Review History
+                Review Decisions
               </Link>
             </div>
           ) : (

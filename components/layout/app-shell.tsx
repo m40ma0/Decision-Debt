@@ -81,11 +81,11 @@ export function AppShell({
               <Menu className="h-4 w-4" />
               Menu
             </Button>
-            <Button asChild href="/decisions/new" size="sm" className="hidden sm:inline-flex">
+            <Button asChild href="/decisions/new" size="sm" className="hidden lg:inline-flex">
               <Plus className="h-4 w-4" />
               New Decision
             </Button>
-            <form action={signOutAction}>
+            <form action={signOutAction} className="hidden lg:block">
               <Button
                 type="submit"
                 variant="ghost"
@@ -114,10 +114,7 @@ export function AppShell({
             className="absolute right-0 top-0 flex h-full w-[min(22rem,calc(100%-2rem))] flex-col border-l border-ink/10 bg-paper p-4 shadow-soft"
           >
             <div className="flex items-start justify-between gap-4">
-              <div className="min-w-0">
-                <p className="font-semibold">Decision Debt</p>
-                <p className="truncate text-xs text-ink/55">{email}</p>
-              </div>
+              <p className="font-semibold">Menu</p>
               <Button
                 type="button"
                 variant="ghost"
@@ -128,18 +125,28 @@ export function AppShell({
                 <X className="h-5 w-5" />
               </Button>
             </div>
-            <Button
-              asChild
-              href="/decisions/new"
-              className="mt-5 w-full justify-center"
-              onClick={() => setMenuOpen(false)}
-            >
-              <Plus className="h-4 w-4" />
-              New Decision
-            </Button>
             <nav className="mt-5 flex flex-col gap-2" aria-label="Primary">
+              <Link
+                href="/decisions/new"
+                onClick={() => setMenuOpen(false)}
+                className="inline-flex h-10 shrink-0 items-center gap-3 rounded-md bg-ink px-3 text-sm font-medium text-white transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-moss/30"
+              >
+                <Plus className="h-4 w-4" />
+                New Decision
+              </Link>
               {renderNavLinks()}
             </nav>
+            <form action={signOutAction} className="mt-auto border-t border-ink/10 pt-4">
+              <Button
+                type="submit"
+                variant="ghost"
+                className="w-full justify-start"
+                aria-label="Log out"
+              >
+                <LogOut className="h-4 w-4" />
+                Log out
+              </Button>
+            </form>
           </div>
         </div>
       ) : null}

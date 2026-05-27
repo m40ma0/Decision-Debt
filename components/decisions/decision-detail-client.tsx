@@ -768,7 +768,7 @@ function OptionCard({ option }: { option: OptionWithProsCons }) {
               type="button"
               variant="ghost"
               size="sm"
-              aria-label="Delete option"
+              aria-label="Delete"
               title="Delete"
               disabled={pending}
               onClick={removeOption}

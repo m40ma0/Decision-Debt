@@ -93,12 +93,17 @@ export function DecisionList({ decisions }: { decisions: DecisionWithScore[] }) 
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink/35" />
             <Input
               className="pl-9"
+              aria-label="Search decisions"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Search decisions"
             />
           </div>
-          <Select value={status} onChange={(event) => setStatus(event.target.value)}>
+          <Select
+            aria-label="Status"
+            value={status}
+            onChange={(event) => setStatus(event.target.value)}
+          >
             <option value="all">All statuses</option>
             {decisionStatuses.map((item) => (
               <option key={item} value={item}>
@@ -107,6 +112,7 @@ export function DecisionList({ decisions }: { decisions: DecisionWithScore[] }) 
             ))}
           </Select>
           <Select
+            aria-label="Category"
             value={category}
             onChange={(event) => setCategory(event.target.value)}
           >
@@ -117,14 +123,22 @@ export function DecisionList({ decisions }: { decisions: DecisionWithScore[] }) 
               </option>
             ))}
           </Select>
-          <Select value={score} onChange={(event) => setScore(event.target.value)}>
+          <Select
+            aria-label="Score"
+            value={score}
+            onChange={(event) => setScore(event.target.value)}
+          >
             <option value="all">All scores</option>
             <option value="low">Low</option>
             <option value="medium">Medium</option>
             <option value="high">High</option>
             <option value="critical">Critical</option>
           </Select>
-          <Select value={sort} onChange={(event) => setSort(event.target.value as SortKey)}>
+          <Select
+            aria-label="Sort"
+            value={sort}
+            onChange={(event) => setSort(event.target.value as SortKey)}
+          >
             <option value="score">Sort by score</option>
             <option value="deadline">Sort by deadline</option>
             <option value="age">Sort by age</option>
@@ -154,7 +168,9 @@ export function DecisionList({ decisions }: { decisions: DecisionWithScore[] }) 
             >
               <Link href={`/decisions/${decision.id}`} className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="truncate font-semibold">{decision.title}</h2>
+                  <h2 className="min-w-0 break-words font-semibold lg:truncate">
+                    {decision.title}
+                  </h2>
                   <Badge tone="blue">{categoryLabels[decision.category]}</Badge>
                 </div>
                 <p className="mt-1 line-clamp-1 text-sm text-ink/55">
@@ -180,7 +196,7 @@ export function DecisionList({ decisions }: { decisions: DecisionWithScore[] }) 
                   type="button"
                   variant="ghost"
                   size="sm"
-                  aria-label="Remove decision"
+                  aria-label="Delete"
                   title="Delete"
                   disabled={pendingId === decision.id}
                   onClick={() => remove(decision.id)}

@@ -106,7 +106,7 @@ export function AppShell({
           <button
             type="button"
             className="absolute inset-0 bg-ink/30"
-            aria-label="Close navigation"
+            aria-label="Close menu overlay"
             onClick={() => setMenuOpen(false)}
           />
           <div

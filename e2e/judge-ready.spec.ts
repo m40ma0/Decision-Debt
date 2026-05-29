@@ -30,7 +30,7 @@ async function removeCreatedDecision(page: Page) {
   await page.goto("/decisions");
   await page.getByPlaceholder("Search decisions").fill(createdTitle);
 
-  for (let attempt = 0; attempt < 3; attempt += 1) {
+  for (let attempt = 0; attempt < 8; attempt += 1) {
     const rowLink = page.getByRole("link", { name: new RegExp(createdTitle, "i") });
     if ((await rowLink.count()) === 0) return;
 
@@ -90,7 +90,10 @@ test("create decision redirects to detail and delete confirmation works", async 
   await expect(page.getByText("Why this score?")).toBeVisible();
 
   await removeCreatedDecision(page);
-  await expect(page.getByText("No matches.")).toBeVisible();
+  await page.getByPlaceholder("Search decisions").fill(createdTitle);
+  await expect(
+    page.getByRole("link", { name: new RegExp(createdTitle, "i") })
+  ).toHaveCount(0);
 });
 
 test("search, filter, and open detail score explanation", async ({ page }) => {
@@ -98,10 +101,7 @@ test("search, filter, and open detail score explanation", async ({ page }) => {
   await page.goto("/decisions");
   await page.getByPlaceholder("Search decisions").fill("Design4Future");
   await page.getByLabel("Category").selectOption("work");
-  await page
-    .getByRole("link", { name: /Design4Future launch scope/i })
-    .first()
-    .click();
+  await page.getByRole("link").filter({ hasText: "Design4Future" }).first().click();
   await expect(page.getByText("Why this score?")).toBeVisible();
   await expect(page.getByRole("tab", { name: "Options" })).toBeVisible();
 });

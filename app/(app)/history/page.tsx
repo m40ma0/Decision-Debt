@@ -2,7 +2,11 @@ import Link from "next/link";
 import { Clock3 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { categoryLabels, statusLabels } from "@/lib/constants";
+import {
+  categoryLabels,
+  statusLabels,
+  workflowStageLabels
+} from "@/lib/constants";
 import { getAnalyticsData } from "@/lib/queries";
 import { daysBetween, formatDate, formatDateTime, pluralize } from "@/lib/utils";
 
@@ -50,8 +54,16 @@ export default async function HistoryPage() {
                         <div className="flex flex-wrap gap-2">
                           <Badge tone="green">{statusLabels[decision.status]}</Badge>
                           <Badge tone="blue">{categoryLabels[decision.category]}</Badge>
+                          <Badge tone="neutral">
+                            {workflowStageLabels[decision.workflow_stage]}
+                          </Badge>
                         </div>
                         <h2 className="mt-3 font-semibold">{decision.title}</h2>
+                        <p className="mt-2 text-xs text-ink/45">
+                          Owner: {decision.owner || "Unassigned"} · Workspace:{" "}
+                          {decision.workspace || "None"} · Project:{" "}
+                          {decision.project || "None"}
+                        </p>
                         {decision.final_decision || decision.resolution_reason ? (
                           <p className="mt-2 line-clamp-2 text-sm leading-6 text-ink/60">
                             {decision.final_decision || decision.resolution_reason}

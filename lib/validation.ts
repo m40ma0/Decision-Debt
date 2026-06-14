@@ -19,6 +19,17 @@ export const decisionFormSchema = z.object({
     emptyToNull,
     z.string().date("Use a valid deadline.").nullable().optional()
   ),
+  owner: z.string().optional().default(""),
+  workspace: z.string().optional().default(""),
+  project: z.string().optional().default(""),
+  tags: z.string().optional().default(""),
+  affectedStakeholders: z
+    .coerce.number()
+    .int()
+    .min(0, "Use a number.")
+    .max(1000, "Use a number.")
+    .optional()
+    .default(0),
   reviewDate: z.preprocess(
     emptyToNull,
     z.string().date("Use a valid review date.").nullable().optional()

@@ -8,7 +8,11 @@ import {
 import { StatCard } from "@/components/dashboard/stat-card";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { categoryLabels, statusLabels } from "@/lib/constants";
+import {
+  categoryLabels,
+  statusLabels,
+  workflowStageLabels
+} from "@/lib/constants";
 import { getAnalyticsData } from "@/lib/queries";
 import { pluralize } from "@/lib/utils";
 
@@ -25,6 +29,7 @@ export default async function AnalyticsPage() {
     .slice(0, 8);
   const trapEntries = Object.entries(data.trapCounts).sort(([, a], [, b]) => b - a);
   const statusEntries = Object.entries(data.statusCounts).sort(([, a], [, b]) => b - a);
+  const workflowEntries = Object.entries(data.workflowCounts).sort(([, a], [, b]) => b - a);
   const trendMax = Math.max(1, ...data.debtTrend.map((item) => item.score));
   const averageResolveValue =
     data.resolutionDurations.length === 0
@@ -201,6 +206,26 @@ export default async function AnalyticsPage() {
                   </div>
                 ))}
               </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <h2 className="text-lg font-semibold">Workflow</h2>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {workflowEntries.length === 0 ? (
+              <p className="text-sm text-ink/55">No workflow data.</p>
+            ) : (
+              workflowEntries.map(([stage, count]) => (
+                <div key={stage} className="flex items-center justify-between gap-4 rounded-md bg-white p-3">
+                  <span className="text-sm font-medium">
+                    {workflowStageLabels[stage as keyof typeof workflowStageLabels]}
+                  </span>
+                  <span className="text-sm text-ink/60">{count}</span>
+                </div>
+              ))
             )}
           </CardContent>
         </Card>

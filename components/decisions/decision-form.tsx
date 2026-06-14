@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, Loader2, Save } from "lucide-react";
 import {
+  extractDecisionIntakeAction,
   createDecisionAction,
   updateDecisionAction
 } from "@/app/actions/decisions";
@@ -18,11 +19,17 @@ import {
   stakesLabels
 } from "@/lib/constants";
 import type { Decision } from "@/lib/database.types";
+import type { DecisionIntakeCandidate } from "@/lib/decision-intake";
 
 type DecisionFormState = {
   title: string;
   description: string;
   category: string;
+  owner: string;
+  workspace: string;
+  project: string;
+  tags: string;
+  affectedStakeholders: number;
   deadline: string;
   reviewDate: string;
   stakes: string;
@@ -144,6 +151,11 @@ function decisionToState(decision?: Decision): DecisionFormState {
     title: decision?.title ?? "",
     description: decision?.description ?? "",
     category: decision?.category ?? "work",
+    owner: decision?.owner ?? "",
+    workspace: decision?.workspace ?? "",
+    project: decision?.project ?? "",
+    tags: decision?.tags?.join("\n") ?? "",
+    affectedStakeholders: decision?.affected_stakeholders ?? 0,
     deadline: decision?.deadline ?? "",
     reviewDate: decision?.review_date ?? "",
     stakes: decision?.stakes ?? "medium",
@@ -162,11 +174,17 @@ export function DecisionForm({ decision }: { decision?: Decision }) {
   const router = useRouter();
   const { toast } = useToast();
   const [pending, startTransition] = useTransition();
+  const [intakePending, startIntakeTransition] = useTransition();
   const [submitState, setSubmitState] = useState<
     "idle" | "submitting" | "created" | "saved" | "error"
   >("idle");
   const [form, setForm] = useState<DecisionFormState>(() => decisionToState(decision));
   const [templateId, setTemplateId] = useState("");
+  const [intakeNotes, setIntakeNotes] = useState("");
+  const [intakeCandidates, setIntakeCandidates] = useState<DecisionIntakeCandidate[]>(
+    []
+  );
+  const [selectedCandidateIndex, setSelectedCandidateIndex] = useState(0);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const isEditing = Boolean(decision);
 
@@ -204,6 +222,41 @@ export function DecisionForm({ decision }: { decision?: Decision }) {
     setErrors({});
   }
 
+  function applyCandidate(candidate: DecisionIntakeCandidate) {
+    setForm((current) => ({
+      ...current,
+      title: candidate.title,
+      description: candidate.description,
+      owner: candidate.owner,
+      workspace: candidate.workspace,
+      project: candidate.project,
+      tags: candidate.tags.join("\n"),
+      affectedStakeholders: candidate.affectedStakeholders,
+      deadline: candidate.deadline,
+      confidence: candidate.confidence,
+      blockers: candidate.blockers.join("\n"),
+      nextAction: candidate.nextAction
+    }));
+    setSelectedCandidateIndex(0);
+  }
+
+  async function extractFromNotes() {
+    if (!intakeNotes.trim()) return;
+
+    startIntakeTransition(async () => {
+      const result = await extractDecisionIntakeAction({ notes: intakeNotes });
+      if (!result.ok || !result.data) {
+        toast({ title: result.message, tone: "error" });
+        return;
+      }
+
+      setIntakeCandidates(result.data.candidates);
+      setSelectedCandidateIndex(0);
+      applyCandidate(result.data.candidates[0]);
+      toast({ title: result.message, tone: "success" });
+    });
+  }
+
   function validateClient() {
     const next: Record<string, string> = {};
     if (!form.title.trim()) next.title = "Title is required.";
@@ -218,6 +271,9 @@ export function DecisionForm({ decision }: { decision?: Decision }) {
       if (!Number.isInteger(value) || value < 1 || value > 5) {
         next[key] = "Use a value from 1 to 5.";
       }
+    }
+    if (!Number.isInteger(form.affectedStakeholders) || form.affectedStakeholders < 0) {
+      next.affectedStakeholders = "Use a whole number.";
     }
     if (form.deadline && Number.isNaN(Date.parse(form.deadline))) {
       next.deadline = "Use a valid deadline.";
@@ -326,6 +382,114 @@ export function DecisionForm({ decision }: { decision?: Decision }) {
             </Field>
           ) : null}
 
+          {!isEditing ? (
+            <div className="rounded-lg border border-ink/10 bg-mint/25 p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-ink">
+                    Decision Intake from Notes
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-ink/55">
+                    Paste meeting notes or a Slack update, then extract a structured decision draft.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  disabled={intakePending}
+                  onClick={() => {
+                    const sampleNotes = `Workspace: Brainwave Launch
+Project: Startup product launch
+Decision: Finalize pricing, onboarding, and AI feature scope before demo week.
+Owner: Maya
+Deadline: 2026-06-18
+Stakeholders: 8
+Blockers: finance model, engineering bandwidth, judge narrative
+Options discussed:
+- Option A: launch with a simple $19 starter plan
+- Option B: freemium beta with pricing later
+Next action: lock the launch narrative and assign the pricing owner.
+Confidence: 2`;
+                    setIntakeNotes(sampleNotes);
+                    startIntakeTransition(async () => {
+                      const result = await extractDecisionIntakeAction({
+                        notes: sampleNotes
+                      });
+                      if (result.ok && result.data) {
+                        setIntakeCandidates(result.data.candidates);
+                        setSelectedCandidateIndex(0);
+                        applyCandidate(result.data.candidates[0]);
+                        toast({ title: result.message, tone: "success" });
+                      } else {
+                        toast({ title: result.message, tone: "error" });
+                      }
+                    });
+                  }}
+                >
+                  Use sample notes
+                </Button>
+              </div>
+              <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto]">
+                <Textarea
+                  aria-label="Paste meeting notes"
+                  value={intakeNotes}
+                  onChange={(event) => setIntakeNotes(event.target.value)}
+                  placeholder="Paste meeting notes, Slack updates, or project notes here."
+                />
+                <div className="flex items-start lg:justify-end">
+                  <Button
+                    type="button"
+                    disabled={intakePending || intakeNotes.trim().length < 10}
+                    onClick={extractFromNotes}
+                  >
+                    {intakePending ? "Extracting..." : "Extract draft"}
+                  </Button>
+                </div>
+              </div>
+              {intakeCandidates.length > 0 ? (
+                <div className="mt-4 space-y-3">
+                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-ink/45">
+                    Extraction preview
+                  </p>
+                  <div className="grid gap-3">
+                    {intakeCandidates.map((candidate, index) => {
+                      const active = index === selectedCandidateIndex;
+                      return (
+                        <button
+                          key={`${candidate.title}-${index}`}
+                          type="button"
+                          className={`rounded-md border p-4 text-left transition ${
+                            active
+                              ? "border-moss bg-white shadow-sm"
+                              : "border-ink/10 bg-white/70 hover:border-moss/30"
+                          }`}
+                          onClick={() => {
+                            setSelectedCandidateIndex(index);
+                            applyCandidate(candidate);
+                          }}
+                        >
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-semibold text-ink">{candidate.title}</span>
+                            <span className="text-xs text-ink/45">
+                              {candidate.workspace || "No workspace"} · {candidate.project || "No project"}
+                            </span>
+                          </div>
+                          <p className="mt-2 text-sm leading-6 text-ink/60">
+                            {candidate.description}
+                          </p>
+                          <p className="mt-2 text-xs text-ink/45">
+                            Owner: {candidate.owner || "Unassigned"} · Deadline: {candidate.deadline || "None"} · Confidence: {candidate.confidence}/5
+                          </p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
           <div className="grid gap-4 lg:grid-cols-2">
             <div className="lg:col-span-2">
               <Field label="Title" htmlFor="title" error={errors.title}>
@@ -349,6 +513,46 @@ export function DecisionForm({ decision }: { decision?: Decision }) {
                 />
               </Field>
             </div>
+            <Field label="Owner" htmlFor="owner">
+              <Input
+                id="owner"
+                value={form.owner}
+                onChange={(event) => setField("owner", event.target.value)}
+                placeholder="Assign a clear owner"
+              />
+            </Field>
+            <Field
+              label="Affected stakeholders"
+              htmlFor="affectedStakeholders"
+              error={errors.affectedStakeholders}
+            >
+              <Input
+                id="affectedStakeholders"
+                type="number"
+                min={0}
+                max={1000}
+                value={form.affectedStakeholders}
+                onChange={(event) =>
+                  setField("affectedStakeholders", Number(event.target.value))
+                }
+              />
+            </Field>
+            <Field label="Workspace" htmlFor="workspace">
+              <Input
+                id="workspace"
+                value={form.workspace}
+                onChange={(event) => setField("workspace", event.target.value)}
+                placeholder="Brainwave Launch"
+              />
+            </Field>
+            <Field label="Project" htmlFor="project">
+              <Input
+                id="project"
+                value={form.project}
+                onChange={(event) => setField("project", event.target.value)}
+                placeholder="Startup product launch"
+              />
+            </Field>
             <Field label="Category" htmlFor="category" error={errors.category}>
               <Select
                 id="category"
@@ -374,6 +578,14 @@ export function DecisionForm({ decision }: { decision?: Decision }) {
                   </option>
                 ))}
               </Select>
+            </Field>
+            <Field label="Tags" htmlFor="tags" hint="One per line or comma-separated">
+              <Textarea
+                id="tags"
+                value={form.tags}
+                onChange={(event) => setField("tags", event.target.value)}
+                placeholder="launch\npricing\nai"
+              />
             </Field>
             <Field
               label="Deadline"

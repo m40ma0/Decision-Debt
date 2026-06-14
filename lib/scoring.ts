@@ -10,12 +10,18 @@ export type DebtScore = {
   drivers: {
     age: number;
     deadline: number;
+    impact: number;
+    owner: number;
+    blockers: number;
+    uncertainty: number;
+    stakeholders: number;
+    confidence: number;
+    urgency: number;
+    missingDeadline: number;
     stakes: number;
     emotionalLoad: number;
     timeImpact: number;
     moneyImpact: number;
-    confidence: number;
-    blockers: number;
   };
 };
 
@@ -49,17 +55,24 @@ export function calculateDecisionDebtScore(
     Decision,
     | "created_at"
     | "deadline"
+    | "owner"
+    | "workflow_stage"
     | "stakes"
     | "emotional_load"
     | "time_impact"
     | "money_impact"
     | "confidence"
     | "blockers"
+    | "affected_stakeholders"
     | "status"
   >,
   today = new Date()
 ): DebtScore {
-  if (decision.status !== "open") {
+  if (
+    decision.status === "deleted" ||
+    decision.workflow_stage === "resolved" ||
+    decision.workflow_stage === "outcome_reviewed"
+  ) {
     return {
       score: 0,
       label: "Low",
@@ -67,47 +80,66 @@ export function calculateDecisionDebtScore(
       drivers: {
         age: 0,
         deadline: 0,
+        impact: 0,
+        owner: 0,
+        blockers: 0,
+        uncertainty: 0,
+        stakeholders: 0,
+        confidence: 0,
+        urgency: 0,
+        missingDeadline: 0,
         stakes: 0,
         emotionalLoad: 0,
         timeImpact: 0,
-        moneyImpact: 0,
-        confidence: 0,
-        blockers: 0
+        moneyImpact: 0
       }
     };
   }
 
   const ageDays = Math.max(0, daysBetween(new Date(decision.created_at), today));
-  const age = Math.min(15, Math.floor(ageDays / 2));
+  const age = Math.min(20, Math.round(ageDays * 0.9));
   const deadline = deadlinePoints(decision.deadline, today);
+  const urgency = decision.deadline ? deadline : 4;
   const stakes = stakesWeight[decision.stakes];
-  const emotionalLoad = decision.emotional_load * 5;
-  const timeImpact = decision.time_impact * 4;
-  const moneyImpact = decision.money_impact * 3;
-  const confidence = (6 - decision.confidence) * 5;
-  const blockers = Math.min(12, decision.blockers.length * 4);
+  const emotionalLoad = decision.emotional_load * 2;
+  const timeImpact = decision.time_impact * 3;
+  const moneyImpact = decision.money_impact * 2;
+  const impact = Math.min(20, stakes + emotionalLoad + timeImpact + moneyImpact);
+  const confidence = (6 - decision.confidence) * 3;
+  const uncertainty = Math.min(10, confidence + (decision.confidence <= 2 ? 2 : 0));
+  const blockers = Math.min(15, decision.blockers.length * 3);
+  const owner = decision.owner.trim() ? 0 : 12;
+  const missingDeadline = decision.deadline ? 0 : 6;
+  const stakeholders = Math.min(12, Math.ceil((decision.affected_stakeholders || 0) / 2));
 
   const raw =
     age +
     deadline +
-    stakes +
-    emotionalLoad +
-    timeImpact +
-    moneyImpact +
+    impact +
+    owner +
+    blockers +
+    uncertainty +
+    stakeholders +
     confidence +
-    blockers;
+    urgency +
+    missingDeadline;
   const score = Math.max(0, Math.min(100, Math.round(raw)));
   const explanation: string[] = [];
 
-  if (ageDays >= 14) explanation.push(`Open for ${ageDays} days.`);
-  if (deadline >= 18) explanation.push("Deadline is urgent or overdue.");
-  if (decision.stakes === "high") explanation.push("High stakes.");
-  if (decision.emotional_load >= 4) explanation.push("High emotional load.");
-  if (decision.time_impact >= 4) explanation.push("Large time impact.");
-  if (decision.money_impact >= 4) explanation.push("Large money impact.");
-  if (decision.confidence <= 2) explanation.push("Low confidence.");
+  if (ageDays >= 14) explanation.push(`This decision is ${ageDays} days old.`);
+  if (decision.deadline === null) explanation.push("No deadline is set.");
+  if (decision.deadline && deadline >= 18) explanation.push("Deadline is urgent or overdue.");
+  if (!decision.owner.trim()) explanation.push("No owner is assigned yet.");
+  if (decision.stakes === "high") explanation.push("It has high stakes.");
+  if (decision.emotional_load >= 4) explanation.push("It carries a heavy emotional load.");
+  if (decision.time_impact >= 4) explanation.push("Waiting is costing execution time.");
+  if (decision.money_impact >= 4) explanation.push("There is meaningful financial exposure.");
+  if (decision.confidence <= 2) explanation.push("Confidence is low.");
   if (decision.blockers.length > 0) {
     explanation.push(`${decision.blockers.length} blocker${decision.blockers.length === 1 ? "" : "s"}.`);
+  }
+  if ((decision.affected_stakeholders || 0) > 0) {
+    explanation.push(`${decision.affected_stakeholders} affected stakeholders.`);
   }
 
   if (explanation.length === 0) {
@@ -121,12 +153,18 @@ export function calculateDecisionDebtScore(
     drivers: {
       age,
       deadline,
+      impact,
+      owner,
+      blockers,
+      uncertainty,
+      stakeholders,
+      confidence,
+      urgency,
+      missingDeadline,
       stakes,
       emotionalLoad,
       timeImpact,
-      moneyImpact,
-      confidence,
-      blockers
+      moneyImpact
     }
   };
 }

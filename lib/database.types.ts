@@ -22,6 +22,13 @@ export type DecisionStatus =
   | "delegated"
   | "deleted";
 
+export type DecisionWorkflowStage =
+  | "captured"
+  | "under_review"
+  | "owner_assigned"
+  | "resolved"
+  | "outcome_reviewed";
+
 export type DecisionStakes = "low" | "medium" | "high";
 export type ProConKind = "pro" | "con";
 export type OutcomeQuality = "good" | "okay" | "bad";
@@ -59,6 +66,12 @@ export type Database = {
           description: string;
           category: DecisionCategory;
           status: DecisionStatus;
+          workflow_stage: DecisionWorkflowStage;
+          workspace: string;
+          project: string;
+          owner: string;
+          tags: string[];
+          affected_stakeholders: number;
           deadline: string | null;
           review_date: string | null;
           stakes: DecisionStakes;
@@ -93,6 +106,12 @@ export type Database = {
           description?: string;
           category?: DecisionCategory;
           status?: DecisionStatus;
+          workflow_stage?: DecisionWorkflowStage;
+          workspace?: string;
+          project?: string;
+          owner?: string;
+          tags?: string[];
+          affected_stakeholders?: number;
           deadline?: string | null;
           review_date?: string | null;
           stakes?: DecisionStakes;
@@ -125,6 +144,12 @@ export type Database = {
           description?: string;
           category?: DecisionCategory;
           status?: DecisionStatus;
+          workflow_stage?: DecisionWorkflowStage;
+          workspace?: string;
+          project?: string;
+          owner?: string;
+          tags?: string[];
+          affected_stakeholders?: number;
           deadline?: string | null;
           review_date?: string | null;
           stakes?: DecisionStakes;

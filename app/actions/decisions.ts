@@ -6,10 +6,15 @@ import type {
   DecisionCategory,
   DecisionStakes,
   DecisionStatus,
+  DecisionWorkflowStage,
   Json,
   OutcomeQuality,
   ProConKind
 } from "@/lib/database.types";
+import {
+  extractDecisionIntakeCandidates,
+  type DecisionIntakeCandidate
+} from "@/lib/decision-intake";
 import { parseLines } from "@/lib/utils";
 import { requireUser } from "@/lib/auth";
 import { decisionFormSchema } from "@/lib/validation";
@@ -20,6 +25,14 @@ export type ActionResult<T = undefined> =
 
 const emptyToNull = (value: unknown) =>
   typeof value === "string" && value.trim() === "" ? null : value;
+
+const workflowStageSchema = z.enum([
+  "captured",
+  "under_review",
+  "owner_assigned",
+  "resolved",
+  "outcome_reviewed"
+]);
 
 const optionSchema = z.object({
   title: z.string().trim().min(2, "Option title is too short.").max(160),
@@ -39,6 +52,15 @@ const detailSchema = z.object({
   outcomeNotes: z.string().trim().optional().default("")
 });
 
+const triageSchema = z.object({
+  owner: z.string().trim().optional().default(""),
+  workspace: z.string().trim().optional().default(""),
+  project: z.string().trim().optional().default(""),
+  tags: z.string().trim().optional().default(""),
+  affectedStakeholders: z.coerce.number().int().min(0).max(1000).optional().default(0),
+  workflowStage: workflowStageSchema
+});
+
 const goodEnoughSchema = z.object({
   minimumInformation: z.string().trim().optional().default(""),
   reversibleOption: z.string().trim().optional().default(""),
@@ -54,6 +76,10 @@ const outcomeLearningSchema = z.object({
   ),
   lessonLearned: z.string().trim().optional().default(""),
   outcomeNotes: z.string().trim().optional().default("")
+});
+
+const intakeExtractionSchema = z.object({
+  notes: z.string().trim().min(10, "Paste a few notes to extract from.")
 });
 
 const resolutionSchema = z.discriminatedUnion("action", [
@@ -118,6 +144,19 @@ function validationError(error: z.ZodError): ActionResult {
   };
 }
 
+function splitTags(value: string) {
+  return parseLines(value)
+    .map((tag) => tag.replace(/^#/, "").trim())
+    .filter(Boolean);
+}
+
+function workflowStageForStatus(action: DecisionStatus): DecisionWorkflowStage {
+  if (action === "delegated") return "owner_assigned";
+  if (action === "deferred") return "under_review";
+  if (action === "committed" || action === "deleted") return "resolved";
+  return "captured";
+}
+
 export async function createDecisionAction(
   input: unknown
 ): Promise<ActionResult<{ id: string }>> {
@@ -133,6 +172,12 @@ export async function createDecisionAction(
       title: values.title,
       description: values.description,
       category: values.category as DecisionCategory,
+      workflow_stage: "captured",
+      workspace: values.workspace ?? "",
+      project: values.project ?? "",
+      owner: values.owner ?? "",
+      tags: splitTags(values.tags),
+      affected_stakeholders: values.affectedStakeholders ?? 0,
       deadline: values.deadline ?? null,
       review_date: values.reviewDate ?? null,
       stakes: values.stakes as DecisionStakes,
@@ -170,6 +215,11 @@ export async function updateDecisionAction(
       title: values.title,
       description: values.description,
       category: values.category as DecisionCategory,
+      workspace: values.workspace ?? "",
+      project: values.project ?? "",
+      owner: values.owner ?? "",
+      tags: splitTags(values.tags),
+      affected_stakeholders: values.affectedStakeholders ?? 0,
       deadline: values.deadline ?? null,
       review_date: values.reviewDate ?? null,
       stakes: values.stakes as DecisionStakes,
@@ -191,6 +241,51 @@ export async function updateDecisionAction(
   revalidatePath("/decisions");
   revalidatePath(`/decisions/${id}`);
   return { ok: true, message: "Decision updated." };
+}
+
+export async function updateDecisionTriageAction(
+  id: string,
+  input: unknown
+): Promise<ActionResult> {
+  const parsed = triageSchema.safeParse(input);
+  if (!parsed.success) return validationError(parsed.error);
+
+  const { supabase, user } = await requireUser();
+  const { error } = await supabase
+    .from("decisions")
+    .update({
+      owner: parsed.data.owner,
+      workspace: parsed.data.workspace,
+      project: parsed.data.project,
+      tags: splitTags(parsed.data.tags),
+      affected_stakeholders: parsed.data.affectedStakeholders,
+      workflow_stage: parsed.data.workflowStage
+    })
+    .eq("id", id)
+    .eq("user_id", user.id);
+
+  if (error) return { ok: false, message: error.message };
+  await writeEvent(
+    id,
+    "triage_updated",
+    "Triage updated",
+    [parsed.data.owner, parsed.data.workspace, parsed.data.project]
+      .filter(Boolean)
+      .join(" • "),
+    {
+      owner: parsed.data.owner,
+      workspace: parsed.data.workspace,
+      project: parsed.data.project,
+      tags: splitTags(parsed.data.tags),
+      affectedStakeholders: parsed.data.affectedStakeholders,
+      workflowStage: parsed.data.workflowStage
+    }
+  );
+  revalidatePath("/dashboard");
+  revalidatePath("/decisions");
+  revalidatePath(`/decisions/${id}`);
+  revalidatePath("/review");
+  return { ok: true, message: "Triage saved." };
 }
 
 export async function deleteDecisionAction(id: string): Promise<ActionResult> {
@@ -274,7 +369,8 @@ export async function updateOutcomeLearningAction(
       outcome_quality: (parsed.data.outcomeQuality ?? null) as OutcomeQuality | null,
       confidence_after: parsed.data.confidenceAfter ?? null,
       lesson_learned: parsed.data.lessonLearned,
-      outcome_notes: parsed.data.outcomeNotes
+      outcome_notes: parsed.data.outcomeNotes,
+      workflow_stage: "outcome_reviewed"
     })
     .eq("id", id)
     .eq("user_id", user.id);
@@ -290,6 +386,27 @@ export async function updateOutcomeLearningAction(
   revalidatePath("/analytics");
   revalidatePath("/history");
   return { ok: true, message: "Outcome saved." };
+}
+
+export async function extractDecisionIntakeAction(
+  input: unknown
+): Promise<ActionResult<{ candidates: DecisionIntakeCandidate[] }>> {
+  const parsed = intakeExtractionSchema.safeParse(input);
+  if (!parsed.success) return validationError(parsed.error);
+
+  const candidates = extractDecisionIntakeCandidates(parsed.data.notes).slice(0, 3);
+  if (candidates.length === 0) {
+    return {
+      ok: false,
+      message: "No decision-shaped notes found. Try including a decision, owner, or deadline."
+    };
+  }
+
+  return {
+    ok: true,
+    message: `Extracted ${candidates.length} decision candidate${candidates.length === 1 ? "" : "s"}.`,
+    data: { candidates }
+  };
 }
 
 export async function addOptionAction(
@@ -403,7 +520,8 @@ export async function resolveDecisionAction(input: unknown): Promise<ActionResul
   const now = new Date().toISOString();
   const update: Record<string, unknown> = {
     status: action,
-    resolution_reason: "reason" in parsed.data ? parsed.data.reason : ""
+    resolution_reason: "reason" in parsed.data ? parsed.data.reason : "",
+    workflow_stage: workflowStageForStatus(action)
   };
 
   if (parsed.data.action === "committed") {
@@ -421,7 +539,7 @@ export async function resolveDecisionAction(input: unknown): Promise<ActionResul
   if (parsed.data.action === "delegated") {
     update.delegated_to = parsed.data.delegatedTo;
     update.review_date = parsed.data.reviewDate ?? null;
-    update.resolved_at = now;
+    update.resolved_at = null;
   }
 
   if (parsed.data.action === "deleted") {

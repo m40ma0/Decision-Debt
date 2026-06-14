@@ -27,10 +27,16 @@ export function detectDecisionTraps(
     | "confidence"
     | "blockers"
     | "status"
+    | "workflow_stage"
   >,
   today = new Date()
 ): TrapTag[] {
-  if (decision.status !== "open" && decision.status !== "deferred") return [];
+  if (
+    decision.workflow_stage === "resolved" ||
+    decision.workflow_stage === "outcome_reviewed"
+  ) {
+    return [];
+  }
 
   const traps: TrapTag[] = [];
   const ageDays = Math.max(0, daysBetween(new Date(decision.created_at), today));
@@ -118,7 +124,10 @@ export function getCostOfWaiting(
     | "money_impact"
     | "confidence"
     | "blockers"
+    | "owner"
+    | "affected_stakeholders"
     | "status"
+    | "workflow_stage"
     | "next_action"
     | "fifteen_minute_action"
   >,

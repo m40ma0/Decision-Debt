@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { extractDecisionIntakeCandidates } from "@/lib/decision-intake";
 import { calculateDecisionDebtScore } from "@/lib/scoring";
 import { detectDecisionTraps, getCostOfWaiting } from "@/lib/decision-intelligence";
 import { decisionFormSchema } from "@/lib/validation";
@@ -12,6 +13,12 @@ const baseDecision: Decision = {
   description: "Choose a plan before enrollment closes.",
   category: "health",
   status: "open",
+  workflow_stage: "captured",
+  workspace: "Brainwave Launch",
+  project: "Startup product launch",
+  owner: "",
+  tags: ["health"],
+  affected_stakeholders: 8,
   deadline: "2026-05-24",
   review_date: null,
   stakes: "high",
@@ -82,6 +89,11 @@ test("decision form validation rejects empty required fields and bad scores", ()
     title: "",
     description: "",
     category: "work",
+    owner: "",
+    workspace: "",
+    project: "",
+    tags: "",
+    affectedStakeholders: 0,
     stakes: "medium",
     emotionalLoad: 0,
     timeImpact: 6,
@@ -97,4 +109,24 @@ test("decision form validation rejects empty required fields and bad scores", ()
     assert.ok(fields.emotionalLoad?.length);
     assert.ok(fields.timeImpact?.length);
   }
+});
+
+test("extracts structured decision candidates from notes", () => {
+  const candidates = extractDecisionIntakeCandidates(`Workspace: Brainwave Launch
+Project: Startup product launch
+Decision: Finalize pricing model before demo week.
+Owner: Maya
+Deadline: 2026-06-18
+Stakeholders: 8
+Blockers: finance model, engineering bandwidth
+Options discussed:
+- Option A: launch with a simple $19 starter plan
+- Option B: freemium beta with pricing later
+Next action: lock the launch narrative.
+Confidence: 2`);
+
+  assert.ok(candidates.length > 0);
+  assert.equal(candidates[0].owner, "Maya");
+  assert.equal(candidates[0].deadline, "2026-06-18");
+  assert.ok(candidates[0].options.length >= 2);
 });

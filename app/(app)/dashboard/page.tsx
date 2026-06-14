@@ -15,7 +15,11 @@ import { TrapTags } from "@/components/trap-tags";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { categoryLabels, statusLabels } from "@/lib/constants";
+import {
+  categoryLabels,
+  statusLabels,
+  workflowStageLabels
+} from "@/lib/constants";
 import { getDashboardData } from "@/lib/queries";
 import { formatDate, pluralize } from "@/lib/utils";
 
@@ -23,7 +27,6 @@ export default async function DashboardPage() {
   const data = await getDashboardData();
   const hasDemoData =
     data.decisions.filter((decision) => decision.is_demo).length >= 13;
-  const totalDebt = data.open.reduce((sum, decision) => sum + decision.debt.score, 0);
   const topTrap = data.open
     .flatMap((decision) => decision.traps)
     .reduce<Record<string, number>>((acc, trap) => {
@@ -31,6 +34,7 @@ export default async function DashboardPage() {
       return acc;
     }, {});
   const dominantTrap = Object.entries(topTrap).sort(([, a], [, b]) => b - a)[0];
+  const workflowEntries = Object.entries(data.workflowCounts).sort(([, a], [, b]) => b - a);
 
   return (
     <div className="space-y-6">
@@ -45,8 +49,47 @@ export default async function DashboardPage() {
         </div>
         <div className="flex flex-wrap gap-2">
           <DemoDataButton hasDemoData={hasDemoData} />
+          <Button
+            asChild
+            href="/api/export?format=csv"
+            download="decision-debt-export.csv"
+            variant="outline"
+            size="sm"
+          >
+            Export CSV
+          </Button>
+          <Button
+            asChild
+            href="/api/export?format=md"
+            download="decision-debt-export.md"
+            variant="outline"
+            size="sm"
+          >
+            Export Markdown
+          </Button>
         </div>
       </div>
+
+      {hasDemoData ? (
+        <Card className="border-berry/20 bg-berry/5">
+          <CardContent>
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-[0.16em] text-berry">
+                  Demo scenario
+                </p>
+                <p className="mt-2 text-lg font-semibold text-ink">
+                  Startup launch blocked by pricing, onboarding, and AI scope decisions.
+                </p>
+              </div>
+              <p className="max-w-2xl text-sm leading-6 text-ink/65">
+                The dashboard is seeded to show an unresolved startup launch with
+                clear owners, blockers, and one resolved outcome review.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
 
       {data.decisions.length === 0 ? (
         <EmptyState
@@ -66,53 +109,75 @@ export default async function DashboardPage() {
         <>
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <StatCard
-              label="Open decisions"
+              label="Unresolved decisions"
               value={data.open.length}
               icon={<ListChecks className="h-5 w-5" />}
               tone="green"
             />
             <StatCard
-              label="Critical"
-              value={data.critical.length}
+              label="Total debt score"
+              value={data.totalUnresolvedDebt}
+              icon={<Clock3 className="h-5 w-5" />}
+            />
+            <StatCard
+              label="Debt interest"
+              value={data.debtInterest}
               icon={<AlertTriangle className="h-5 w-5" />}
               tone="red"
             />
             <StatCard
-              label="Due this week"
-              value={data.dueThisWeek.length}
+              label="Without owners"
+              value={data.decisionsWithoutOwners.length}
               icon={<CalendarDays className="h-5 w-5" />}
               tone="amber"
             />
-            <StatCard
-              label="Total debt score"
-              value={totalDebt}
-              icon={<Clock3 className="h-5 w-5" />}
-            />
           </div>
 
-          <Card className="border-moss/20 bg-mint/35">
-            <CardContent>
-              <div className="grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)_220px] lg:items-center">
-                <div>
-                  <p className="text-sm font-semibold uppercase tracking-[0.16em] text-moss">
-                    Operating brief
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(320px,0.7fr)]">
+            <Card className="border-moss/20 bg-mint/35">
+              <CardContent>
+                <div className="grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)_220px] lg:items-center">
+                  <div>
+                    <p className="text-sm font-semibold uppercase tracking-[0.16em] text-moss">
+                      Cost of Delay
+                    </p>
+                    <p className="mt-2 text-2xl font-semibold">
+                      {pluralize(data.averageAge, "day")} average age
+                    </p>
+                  </div>
+                  <p className="text-sm leading-6 text-ink/70">
+                    {dominantTrap
+                      ? `Top trap: ${dominantTrap[0].toLowerCase()}. Clear one blocker today.`
+                      : "Light load. Keep each decision moving."}
                   </p>
-                  <p className="mt-2 text-2xl font-semibold">
-                    {pluralize(data.averageAge, "day")} average age
-                  </p>
+                  <Button asChild href="/review" variant="secondary">
+                    <TrendingDown className="h-4 w-4" />
+                    Review Now
+                  </Button>
                 </div>
-                <p className="text-sm leading-6 text-ink/70">
-                  {dominantTrap
-                    ? `Top trap: ${dominantTrap[0].toLowerCase()}. Clear one blocker today.`
-                    : "Light load. Keep each decision moving."}
-                </p>
-                <Button asChild href="/review" variant="secondary">
-                  <TrendingDown className="h-4 w-4" />
-                  Review Now
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <h2 className="text-lg font-semibold">Workflow Snapshot</h2>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {workflowEntries.length === 0 ? (
+                  <p className="text-sm text-ink/55">No workflow data yet.</p>
+                ) : (
+                  workflowEntries.map(([stage, count]) => (
+                    <div key={stage} className="flex items-center justify-between gap-3">
+                      <span className="text-sm text-ink/70">
+                        {workflowStageLabels[stage as keyof typeof workflowStageLabels]}
+                      </span>
+                      <Badge tone="neutral">{count}</Badge>
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+          </div>
 
           <div className="grid gap-6 xl:grid-cols-[minmax(0,1.5fr)_minmax(320px,0.8fr)]">
             <Card>
@@ -151,10 +216,19 @@ export default async function DashboardPage() {
                           <div className="mt-3 flex flex-wrap gap-2">
                             <Badge tone="blue">{categoryLabels[decision.category]}</Badge>
                             <Badge tone="neutral">{formatDate(decision.deadline)}</Badge>
+                            <Badge tone="green">
+                              {workflowStageLabels[decision.workflow_stage]}
+                            </Badge>
                           </div>
                           <div className="mt-3">
                             <TrapTags traps={decision.traps} limit={3} compact />
                           </div>
+                          <p className="mt-3 text-xs leading-5 text-ink/50">
+                            Owner: {decision.owner || "Unassigned"} ·{" "}
+                            {decision.blockers.length} blocker
+                            {decision.blockers.length === 1 ? "" : "s"} ·{" "}
+                            {decision.affected_stakeholders} stakeholders
+                          </p>
                           <p className="mt-3 text-xs leading-5 text-ink/50">
                             {decision.costOfWaiting.whatGetsWorse}
                           </p>
@@ -171,6 +245,41 @@ export default async function DashboardPage() {
             </Card>
 
             <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <h2 className="text-lg font-semibold">Impact Breakdown</h2>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-sm text-ink/65">Blocking execution</span>
+                    <span className="text-sm font-semibold">
+                      {data.decisionsBlockingExecution.length}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-sm text-ink/65">Average age</span>
+                    <span className="text-sm font-semibold">
+                      {pluralize(data.averageAge, "day")}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-sm text-ink/65">Recently resolved</span>
+                    <span className="text-sm font-semibold">
+                      {data.recentlyResolved.length}
+                    </span>
+                  </div>
+                  {data.highestRisk ? (
+                    <div className="rounded-md border border-ink/10 bg-white p-3">
+                      <p className="text-sm font-semibold">{data.highestRisk.title}</p>
+                      <p className="mt-1 text-xs text-ink/55">
+                        {data.highestRisk.debt.score} debt score ·{" "}
+                        {data.highestRisk.debt.explanation[0]}
+                      </p>
+                    </div>
+                  ) : null}
+                </CardContent>
+              </Card>
+
               <Card>
                 <CardHeader>
                   <h2 className="text-lg font-semibold">Categories</h2>

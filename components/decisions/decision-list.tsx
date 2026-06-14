@@ -16,6 +16,8 @@ import {
   categoryLabels,
   decisionCategories,
   decisionStatuses,
+  workflowStages,
+  workflowStageLabels,
   statusLabels
 } from "@/lib/constants";
 import type { DecisionWithScore } from "@/lib/queries";
@@ -30,6 +32,7 @@ export function DecisionList({ decisions }: { decisions: DecisionWithScore[] }) 
   const [, startTransition] = useTransition();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
+  const [stage, setStage] = useState("all");
   const [category, setCategory] = useState("all");
   const [score, setScore] = useState("all");
   const [sort, setSort] = useState<SortKey>("score");
@@ -40,15 +43,24 @@ export function DecisionList({ decisions }: { decisions: DecisionWithScore[] }) 
       .filter((decision) => {
         const matchesSearch =
           normalized.length === 0 ||
-          [decision.title, decision.description, decision.next_action]
+          [
+            decision.title,
+            decision.description,
+            decision.next_action,
+            decision.owner,
+            decision.workspace,
+            decision.project,
+            decision.tags.join(" ")
+          ]
             .join(" ")
             .toLowerCase()
             .includes(normalized);
         const matchesStatus = status === "all" || decision.status === status;
+        const matchesStage = stage === "all" || decision.workflow_stage === stage;
         const matchesCategory = category === "all" || decision.category === category;
         const matchesScore =
           score === "all" || decision.debt.label.toLowerCase() === score;
-        return matchesSearch && matchesStatus && matchesCategory && matchesScore;
+        return matchesSearch && matchesStatus && matchesStage && matchesCategory && matchesScore;
       })
       .sort((a, b) => {
         if (sort === "score") return b.debt.score - a.debt.score;
@@ -65,7 +77,7 @@ export function DecisionList({ decisions }: { decisions: DecisionWithScore[] }) 
         }
         return a.category.localeCompare(b.category);
       });
-  }, [category, decisions, score, search, sort, status]);
+  }, [category, decisions, score, search, sort, stage, status]);
 
   function remove(id: string) {
     if (
@@ -88,7 +100,7 @@ export function DecisionList({ decisions }: { decisions: DecisionWithScore[] }) 
   return (
     <div className="space-y-4">
       <Card className="p-4">
-        <div className="grid gap-3 lg:grid-cols-[minmax(220px,1fr)_160px_160px_160px_160px]">
+        <div className="grid gap-3 lg:grid-cols-[minmax(220px,1fr)_160px_160px_160px_160px_160px]">
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink/35" />
             <Input
@@ -108,6 +120,18 @@ export function DecisionList({ decisions }: { decisions: DecisionWithScore[] }) 
             {decisionStatuses.map((item) => (
               <option key={item} value={item}>
                 {statusLabels[item]}
+              </option>
+            ))}
+          </Select>
+          <Select
+            aria-label="Stage"
+            value={stage}
+            onChange={(event) => setStage(event.target.value)}
+          >
+            <option value="all">All stages</option>
+            {workflowStages.map((item) => (
+              <option key={item} value={item}>
+                {workflowStageLabels[item]}
               </option>
             ))}
           </Select>
@@ -172,9 +196,14 @@ export function DecisionList({ decisions }: { decisions: DecisionWithScore[] }) 
                     {decision.title}
                   </h2>
                   <Badge tone="blue">{categoryLabels[decision.category]}</Badge>
+                  <Badge tone="neutral">{workflowStageLabels[decision.workflow_stage]}</Badge>
                 </div>
                 <p className="mt-1 line-clamp-1 text-sm text-ink/55">
                   {decision.description || decision.next_action || "No details"}
+                </p>
+                <p className="mt-1 line-clamp-1 text-xs text-ink/45">
+                  {decision.owner ? `Owner: ${decision.owner}` : "No owner"} ·{" "}
+                  {decision.workspace || "No workspace"} · {decision.project || "No project"}
                 </p>
                 <div className="mt-2">
                   <TrapTags traps={decision.traps} limit={3} compact />

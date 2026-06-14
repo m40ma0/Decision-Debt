@@ -19,6 +19,7 @@ import {
   addProConAction,
   deleteOptionAction,
   deleteProConAction,
+  updateDecisionTriageAction,
   updateGoodEnoughAction,
   updateDecisionDetailAction,
   updateOutcomeLearningAction,
@@ -33,11 +34,24 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Field, Input, Select, Textarea } from "@/components/ui/field";
 import { useToast } from "@/components/toast-provider";
-import { categoryLabels, stakesLabels, statusLabels } from "@/lib/constants";
+import {
+  categoryLabels,
+  stakesLabels,
+  statusLabels,
+  workflowStageLabels,
+  workflowStages
+} from "@/lib/constants";
 import type { DecisionDetail, OptionWithProsCons } from "@/lib/queries";
 import { cn, formatDate, formatDateTime } from "@/lib/utils";
 
-type DetailTab = "overview" | "options" | "unblock" | "resolve" | "edit" | "history";
+type DetailTab =
+  | "overview"
+  | "workflow"
+  | "options"
+  | "unblock"
+  | "resolve"
+  | "edit"
+  | "history";
 
 export function DecisionDetailClient({ detail }: { detail: DecisionDetail }) {
   const router = useRouter();
@@ -48,6 +62,14 @@ export function DecisionDetailClient({ detail }: { detail: DecisionDetail }) {
     missingInformation: detail.decision.missing_information.join("\n"),
     nextAction: detail.decision.next_action,
     outcomeNotes: detail.decision.outcome_notes
+  });
+  const [triage, setTriage] = useState({
+    owner: detail.decision.owner ?? "",
+    workspace: detail.decision.workspace ?? "",
+    project: detail.decision.project ?? "",
+    tags: detail.decision.tags.join("\n"),
+    affectedStakeholders: detail.decision.affected_stakeholders ?? 0,
+    workflowStage: detail.decision.workflow_stage
   });
   const [goodEnough, setGoodEnough] = useState({
     minimumInformation: detail.decision.minimum_information ?? "",
@@ -63,11 +85,13 @@ export function DecisionDetailClient({ detail }: { detail: DecisionDetail }) {
   });
   const [activeTab, setActiveTab] = useState<DetailTab>("overview");
   const isActionable =
-    detail.decision.status === "open" || detail.decision.status === "deferred";
+    detail.decision.workflow_stage !== "resolved" &&
+    detail.decision.workflow_stage !== "outcome_reviewed";
   const isResolved = !isActionable;
 
   const tabs: Array<{ id: DetailTab; label: string }> = [
     { id: "overview", label: "Overview" },
+    { id: "workflow", label: "Workflow" },
     { id: "options", label: "Options" },
     { id: "unblock", label: "Unblock" },
     { id: "resolve", label: "Resolve" },
@@ -76,22 +100,13 @@ export function DecisionDetailClient({ detail }: { detail: DecisionDetail }) {
   ];
 
   const scoreContributors = [
+    { label: "Age", value: detail.decision.debt.drivers.age, max: 20 },
     { label: "Deadline", value: detail.decision.debt.drivers.deadline, max: 25 },
-    { label: "Age", value: detail.decision.debt.drivers.age, max: 15 },
-    { label: "Stakes", value: detail.decision.debt.drivers.stakes, max: 20 },
-    {
-      label: "Emotion",
-      value: detail.decision.debt.drivers.emotionalLoad,
-      max: 25
-    },
-    { label: "Time", value: detail.decision.debt.drivers.timeImpact, max: 20 },
-    { label: "Money", value: detail.decision.debt.drivers.moneyImpact, max: 15 },
-    {
-      label: "Confidence",
-      value: detail.decision.debt.drivers.confidence,
-      max: 25
-    },
-    { label: "Blockers", value: detail.decision.debt.drivers.blockers, max: 12 }
+    { label: "Impact", value: detail.decision.debt.drivers.impact, max: 20 },
+    { label: "Missing owner", value: detail.decision.debt.drivers.owner, max: 12 },
+    { label: "Blockers", value: detail.decision.debt.drivers.blockers, max: 15 },
+    { label: "Uncertainty", value: detail.decision.debt.drivers.uncertainty, max: 10 },
+    { label: "Stakeholders", value: detail.decision.debt.drivers.stakeholders, max: 12 }
   ];
 
   function saveNotes(event: React.FormEvent<HTMLFormElement>) {
@@ -137,6 +152,15 @@ export function DecisionDetailClient({ detail }: { detail: DecisionDetail }) {
     });
   }
 
+  function saveTriage(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    startTransition(async () => {
+      const result = await updateDecisionTriageAction(detail.decision.id, triage);
+      toast({ title: result.message, tone: result.ok ? "success" : "error" });
+      if (result.ok) router.refresh();
+    });
+  }
+
   return (
     <div className="space-y-5">
       <Card>
@@ -147,6 +171,9 @@ export function DecisionDetailClient({ detail }: { detail: DecisionDetail }) {
                 <Badge tone="blue">{categoryLabels[detail.decision.category]}</Badge>
                 <Badge tone="neutral">{statusLabels[detail.decision.status]}</Badge>
                 <Badge tone="amber">{stakesLabels[detail.decision.stakes]} stakes</Badge>
+                <Badge tone="green">
+                  {workflowStageLabels[detail.decision.workflow_stage]}
+                </Badge>
               </div>
               <h1 className="mt-4 text-2xl font-semibold tracking-normal sm:text-3xl">
                 {detail.decision.title}
@@ -160,6 +187,23 @@ export function DecisionDetailClient({ detail }: { detail: DecisionDetail }) {
                 <span>Deadline: {formatDate(detail.decision.deadline)}</span>
                 <span>Updated: {formatDateTime(detail.decision.updated_at)}</span>
               </div>
+              <div className="mt-3 flex flex-wrap gap-2 text-sm text-ink/55">
+                <span>Owner: {detail.decision.owner || "Unassigned"}</span>
+                <span>Workspace: {detail.decision.workspace || "No workspace"}</span>
+                <span>Project: {detail.decision.project || "No project"}</span>
+                <span>
+                  Stakeholders: {detail.decision.affected_stakeholders || 0}
+                </span>
+              </div>
+              {detail.decision.tags.length > 0 ? (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {detail.decision.tags.map((tag) => (
+                    <Badge key={tag} tone="neutral">
+                      #{tag}
+                    </Badge>
+                  ))}
+                </div>
+              ) : null}
               <div className="mt-4">
                 <TrapTags traps={detail.decision.traps} />
               </div>
@@ -175,6 +219,21 @@ export function DecisionDetailClient({ detail }: { detail: DecisionDetail }) {
               <p className="mt-2 text-sm leading-6 text-ink/60">
                 {detail.decision.costOfWaiting.nextAction}
               </p>
+              <div className="mt-4 rounded-md bg-mint/40 p-3 text-sm text-ink/70">
+                <p className="font-semibold text-ink">Workflow</p>
+                <p className="mt-1">
+                  {workflowStageLabels[detail.decision.workflow_stage]} ·{" "}
+                  {detail.decision.workflow_stage === "captured"
+                    ? "Captured from notes."
+                    : detail.decision.workflow_stage === "under_review"
+                      ? "Triage the blockers and missing facts."
+                      : detail.decision.workflow_stage === "owner_assigned"
+                        ? "An owner is taking point."
+                        : detail.decision.workflow_stage === "resolved"
+                          ? "A decision has been made."
+                          : "Learning has been recorded."}
+                </p>
+              </div>
             </div>
           </div>
         </CardContent>
@@ -296,6 +355,155 @@ export function DecisionDetailClient({ detail }: { detail: DecisionDetail }) {
                     </p>
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+          </div>
+        ) : null}
+
+        {activeTab === "workflow" ? (
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+            <Card>
+              <CardHeader>
+                <h2 className="text-lg font-semibold">Capture to Outcome Workflow</h2>
+              </CardHeader>
+              <CardContent className="space-y-5">
+                <div className="grid gap-3 md:grid-cols-5">
+                  {workflowStages.map((stage) => {
+                    const active = detail.decision.workflow_stage === stage;
+                    return (
+                      <div
+                        key={stage}
+                        className={`rounded-md border p-3 text-sm ${
+                          active ? "border-moss bg-mint/40" : "border-ink/10 bg-white"
+                        }`}
+                      >
+                        <p className="font-semibold text-ink">
+                          {workflowStageLabels[stage]}
+                        </p>
+                        <p className="mt-1 text-xs leading-5 text-ink/55">
+                          {stage === "captured"
+                            ? "Notes land here first."
+                            : stage === "under_review"
+                              ? "Clarify blockers and uncertainty."
+                              : stage === "owner_assigned"
+                                ? "Assign a clear owner."
+                                : stage === "resolved"
+                                  ? "Make the decision."
+                                  : "Review the outcome and lesson."}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <form className="grid gap-4 lg:grid-cols-2" onSubmit={saveTriage}>
+                  <Field label="Workflow stage" htmlFor="workflowStage">
+                    <Select
+                      id="workflowStage"
+                      value={triage.workflowStage}
+                      onChange={(event) =>
+                        setTriage((current) => ({
+                          ...current,
+                          workflowStage: event.target.value as typeof triage.workflowStage
+                        }))
+                      }
+                    >
+                      {workflowStages.map((stage) => (
+                        <option key={stage} value={stage}>
+                          {workflowStageLabels[stage]}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+                  <Field label="Owner" htmlFor="triageOwner">
+                    <Input
+                      id="triageOwner"
+                      value={triage.owner}
+                      onChange={(event) =>
+                        setTriage((current) => ({ ...current, owner: event.target.value }))
+                      }
+                    />
+                  </Field>
+                  <Field label="Workspace" htmlFor="triageWorkspace">
+                    <Input
+                      id="triageWorkspace"
+                      value={triage.workspace}
+                      onChange={(event) =>
+                        setTriage((current) => ({
+                          ...current,
+                          workspace: event.target.value
+                        }))
+                      }
+                    />
+                  </Field>
+                  <Field label="Project" htmlFor="triageProject">
+                    <Input
+                      id="triageProject"
+                      value={triage.project}
+                      onChange={(event) =>
+                        setTriage((current) => ({
+                          ...current,
+                          project: event.target.value
+                        }))
+                      }
+                    />
+                  </Field>
+                  <Field
+                    label="Stakeholders"
+                    htmlFor="triageStakeholders"
+                  >
+                    <Input
+                      id="triageStakeholders"
+                      type="number"
+                      min={0}
+                      value={triage.affectedStakeholders}
+                      onChange={(event) =>
+                        setTriage((current) => ({
+                          ...current,
+                          affectedStakeholders: Number(event.target.value)
+                        }))
+                      }
+                    />
+                  </Field>
+                  <div className="lg:col-span-2">
+                    <Field label="Tags" htmlFor="triageTags" hint="One per line">
+                      <Textarea
+                        id="triageTags"
+                        value={triage.tags}
+                        onChange={(event) =>
+                          setTriage((current) => ({ ...current, tags: event.target.value }))
+                        }
+                      />
+                    </Field>
+                  </div>
+                  <div className="lg:col-span-2 flex justify-end">
+                    <Button type="submit" disabled={pending}>
+                      Save Triage
+                    </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+
+            <Card className="border-moss/20 bg-mint/35">
+              <CardHeader>
+                <h2 className="text-lg font-semibold">Assignment Story</h2>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm leading-6 text-ink/70">
+                <p>
+                  The workflow makes the demo easier to explain: capture the note,
+                  triage the uncertainty, assign an owner, resolve it, and review
+                  the outcome.
+                </p>
+                <p>
+                  Current stage: <span className="font-semibold text-ink">{workflowStageLabels[triage.workflowStage]}</span>
+                </p>
+                <p>
+                  Ownership:{" "}
+                  <span className="font-semibold text-ink">
+                    {triage.owner || "Unassigned"}
+                  </span>
+                </p>
               </CardContent>
             </Card>
           </div>

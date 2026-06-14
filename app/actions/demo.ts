@@ -25,6 +25,12 @@ type DemoDecision = {
   blockers: string[];
   missing_information: string[];
   next_action: string;
+  owner?: string;
+  workspace?: string;
+  project?: string;
+  tags?: string[];
+  affected_stakeholders?: number;
+  workflow_stage?: "captured" | "under_review" | "owner_assigned" | "resolved" | "outcome_reviewed";
   minimum_information?: string;
   reversible_option?: string;
   do_nothing_cost?: string;
@@ -54,8 +60,9 @@ const daysAgo = (days: number) => {
 
 const demoDecisions: DemoDecision[] = [
   {
-    title: "Choose the launch scope for the Design4Future submission",
-    description: "Pick the smallest set of features that makes the story clear without overbuilding.",
+    title: "Startup launch pricing model is blocking the demo",
+    description:
+      "The team needs to decide how to price the launch so the story is clear without overbuilding the product.",
     category: "work",
     deadline: isoDate(1),
     stakes: "high",
@@ -63,9 +70,15 @@ const demoDecisions: DemoDecision[] = [
     time_impact: 5,
     money_impact: 2,
     confidence: 2,
+    owner: "",
+    workspace: "Brainwave Launch",
+    project: "Startup product launch",
+    tags: ["pricing", "launch", "demo"],
+    affected_stakeholders: 9,
+    workflow_stage: "captured",
     blockers: ["unclear judging priority", "limited build time", "too many feature ideas"],
-    missing_information: ["Which demo path will be strongest?", "What can be cut safely?"],
-    next_action: "Compare scoring rubric against the top feature list.",
+    missing_information: ["Which pricing story is strongest?", "What can be cut safely?"],
+    next_action: "Compare the launch pricing options against the judging rubric.",
     created_at: daysAgo(18),
     options: [
       {
@@ -83,8 +96,9 @@ const demoDecisions: DemoDecision[] = [
     ]
   },
   {
-    title: "Decide whether to renew the apartment lease",
-    description: "The renewal offer is higher, but moving has hidden costs and time pressure.",
+    title: "Onboarding flow needs an owner before beta",
+    description:
+      "The beta onboarding journey is fragile, and the launch plan needs a named owner plus one clear flow.",
     category: "money",
     deadline: isoDate(3),
     stakes: "high",
@@ -92,9 +106,15 @@ const demoDecisions: DemoDecision[] = [
     time_impact: 4,
     money_impact: 5,
     confidence: 2,
-    blockers: ["waiting for landlord reply", "moving quotes missing"],
-    missing_information: ["Final rent offer", "Two mover quotes", "Commute change"],
-    next_action: "Ask landlord for final renewal terms.",
+    owner: "Maya",
+    workspace: "Brainwave Launch",
+    project: "Startup product launch",
+    tags: ["onboarding", "beta"],
+    affected_stakeholders: 14,
+    workflow_stage: "under_review",
+    blockers: ["copy not finalized", "tooltips missing", "handoff from growth team"],
+    missing_information: ["Which onboarding path is simplest?", "Who owns the final copy?"],
+    next_action: "Assign the onboarding owner and narrow the beta flow to one path.",
     created_at: daysAgo(27),
     options: [
       {
@@ -112,8 +132,9 @@ const demoDecisions: DemoDecision[] = [
     ]
   },
   {
-    title: "Pick a health insurance plan",
-    description: "Open enrollment ends soon and plan details are hard to compare.",
+    title: "AI feature scope is too broad for launch",
+    description:
+      "The team needs to decide how much of the AI feature ships in the first release.",
     category: "health",
     deadline: isoDate(5),
     stakes: "high",
@@ -121,9 +142,15 @@ const demoDecisions: DemoDecision[] = [
     time_impact: 3,
     money_impact: 5,
     confidence: 1,
-    blockers: ["deductibles confusing", "doctor coverage unknown"],
-    missing_information: ["Primary doctor network", "Expected prescription costs"],
-    next_action: "Call clinic and confirm accepted plans.",
+    owner: "Jordan",
+    workspace: "Brainwave Launch",
+    project: "Startup product launch",
+    tags: ["ai", "scope", "launch"],
+    affected_stakeholders: 11,
+    workflow_stage: "owner_assigned",
+    blockers: ["model quality uncertain", "scope creep risk"],
+    missing_information: ["Must-have AI use case", "What can wait until v2"],
+    next_action: "Lock the AI scope and write the v1 / v2 split.",
     created_at: daysAgo(12),
     options: [
       {
@@ -411,6 +438,12 @@ const demoDecisions: DemoDecision[] = [
     time_impact: 4,
     money_impact: 1,
     confidence: 4,
+    owner: "Operations",
+    workspace: "Brainwave Launch",
+    project: "Startup product launch",
+    tags: ["rituals", "meeting cadence"],
+    affected_stakeholders: 6,
+    workflow_stage: "outcome_reviewed",
     blockers: ["too many recurring meetings", "unclear decision owner"],
     missing_information: ["Which updates actually need discussion?"],
     next_action: "Pilot a shorter agenda for two weeks.",
@@ -481,6 +514,12 @@ export async function seedDemoDataAction() {
       id: decisionId,
       user_id: user.id,
       status: decision.status ?? ("open" as const),
+      workflow_stage: decision.workflow_stage ?? "captured",
+      owner: decision.owner ?? "",
+      workspace: decision.workspace ?? "",
+      project: decision.project ?? "",
+      tags: decision.tags ?? [],
+      affected_stakeholders: decision.affected_stakeholders ?? 0,
       is_demo: true
     });
 

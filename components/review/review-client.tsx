@@ -9,7 +9,7 @@ import { TrapTags } from "@/components/trap-tags";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { categoryLabels } from "@/lib/constants";
+import { categoryLabels, workflowStageLabels } from "@/lib/constants";
 import type { DecisionWithScore, OptionWithProsCons } from "@/lib/queries";
 import { formatDate } from "@/lib/utils";
 
@@ -88,6 +88,9 @@ export function ReviewClient({ queue }: { queue: ReviewItem[] }) {
                   <div className="flex flex-wrap gap-2">
                     <Badge tone="blue">{categoryLabels[current.category]}</Badge>
                     <Badge tone="neutral">Deadline {formatDate(current.deadline)}</Badge>
+                    <Badge tone="green">
+                      {workflowStageLabels[current.workflow_stage]}
+                    </Badge>
                   </div>
                   <h2 className="mt-4 text-2xl font-semibold tracking-normal">
                     {current.title}
@@ -97,6 +100,11 @@ export function ReviewClient({ queue }: { queue: ReviewItem[] }) {
                       {current.description}
                     </p>
                   ) : null}
+                  <p className="mt-3 text-xs text-ink/45">
+                    Owner: {current.owner || "Unassigned"} · Workspace:{" "}
+                    {current.workspace || "No workspace"} · Project:{" "}
+                    {current.project || "No project"}
+                  </p>
                   <div className="mt-4">
                     <TrapTags traps={current.traps} />
                   </div>

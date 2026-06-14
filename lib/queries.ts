@@ -31,6 +31,12 @@ export type DecisionDetail = {
   events: DecisionEvent[];
 };
 
+const isResolvedWorkflowStage = (stage: Decision["workflow_stage"]) =>
+  stage === "resolved" || stage === "outcome_reviewed";
+
+const isUnresolvedDecision = (decision: DecisionWithScore) =>
+  !isResolvedWorkflowStage(decision.workflow_stage);
+
 export async function getUserDecisions() {
   const { supabase, user } = await requireUser();
   const { data, error } = await supabase
@@ -114,12 +120,11 @@ export async function getDashboardData() {
   const weekFromNow = new Date();
   weekFromNow.setDate(today.getDate() + 7);
 
-  const open = decisions.filter((decision) => decision.status === "open");
-  const active = decisions.filter((decision) =>
-    ["open", "deferred"].includes(decision.status)
+  const open = decisions.filter(isUnresolvedDecision).filter(
+    (decision) => decision.status !== "deleted"
   );
   const critical = open.filter((decision) => decision.debt.label === "Critical");
-  const dueThisWeek = active.filter((decision) => {
+  const dueThisWeek = open.filter((decision) => {
     const deadline = decision.deadline
       ? new Date(`${decision.deadline}T00:00:00`)
       : null;
@@ -151,13 +156,36 @@ export async function getDashboardData() {
   }, {});
 
   const recentlyResolved = decisions
-    .filter((decision) => decision.status !== "open")
+    .filter((decision) => isResolvedWorkflowStage(decision.workflow_stage))
     .sort(
       (a, b) =>
         new Date(b.resolved_at ?? b.updated_at).getTime() -
         new Date(a.resolved_at ?? a.updated_at).getTime()
     )
     .slice(0, 6);
+
+  const workflowCounts = decisions.reduce<Record<string, number>>((acc, decision) => {
+    const stage = decision.workflow_stage;
+    acc[stage] = (acc[stage] ?? 0) + 1;
+    return acc;
+  }, {});
+
+  const decisionsWithoutOwners = open.filter((decision) => !decision.owner.trim());
+  const decisionsBlockingExecution = open.filter(
+    (decision) => decision.blockers.length > 0 || decision.affected_stakeholders > 0
+  );
+  const totalUnresolvedDebt = open.reduce((total, decision) => total + decision.debt.score, 0);
+  const debtInterest = open.reduce(
+    (total, decision) =>
+      total +
+      Math.round(
+        decision.debt.score *
+          Math.max(1, decision.affected_stakeholders || 1) *
+          Math.max(1, daysBetween(new Date(decision.created_at), today) / 7)
+      ),
+    0
+  );
+  const highestRisk = [...open].sort((a, b) => b.debt.score - a.debt.score)[0] ?? null;
 
   return {
     decisions,
@@ -167,20 +195,24 @@ export async function getDashboardData() {
     averageAge,
     topToday,
     categoryBreakdown,
-    recentlyResolved
+    recentlyResolved,
+    workflowCounts,
+    decisionsWithoutOwners,
+    decisionsBlockingExecution,
+    totalUnresolvedDebt,
+    debtInterest,
+    highestRisk
   };
 }
 
 export async function getReviewQueue() {
   const decisions = await getUserDecisions();
-  const today = new Date();
 
   return decisions
-    .filter((decision) => {
-      if (decision.status === "open") return true;
-      if (decision.status !== "deferred" || !decision.review_date) return false;
-      return new Date(`${decision.review_date}T00:00:00`) <= today;
-    })
+    .filter(
+      (decision) =>
+        decision.status !== "deleted" && !isResolvedWorkflowStage(decision.workflow_stage)
+    )
     .sort((a, b) => b.debt.score - a.debt.score);
 }
 
@@ -228,8 +260,10 @@ export async function getReviewQueueDetails() {
 
 export async function getAnalyticsData() {
   const decisions = await getUserDecisions();
-  const resolved = decisions.filter((decision) => decision.status !== "open");
-  const open = decisions.filter((decision) => decision.status === "open");
+  const resolved = decisions.filter((decision) =>
+    isResolvedWorkflowStage(decision.workflow_stage)
+  );
+  const open = decisions.filter((decision) => !isResolvedWorkflowStage(decision.workflow_stage));
   const categoryCounts = decisions.reduce<Record<string, number>>((acc, decision) => {
     acc[decision.category] = (acc[decision.category] ?? 0) + 1;
     return acc;
@@ -240,7 +274,8 @@ export async function getAnalyticsData() {
       total +
       calculateDecisionDebtScore({
         ...decision,
-        status: "open"
+        status: "open",
+        workflow_stage: "captured"
       }).score,
     0
   );
@@ -286,6 +321,11 @@ export async function getAnalyticsData() {
 
   const statusCounts = decisions.reduce<Record<string, number>>((acc, decision) => {
     acc[decision.status] = (acc[decision.status] ?? 0) + 1;
+    return acc;
+  }, {});
+
+  const workflowCounts = decisions.reduce<Record<string, number>>((acc, decision) => {
+    acc[decision.workflow_stage] = (acc[decision.workflow_stage] ?? 0) + 1;
     return acc;
   }, {});
 
@@ -338,6 +378,7 @@ export async function getAnalyticsData() {
     averageAgeByCategory,
     blockerCounts,
     statusCounts,
+    workflowCounts,
     trapCounts,
     categoryRisk,
     highestRiskCategory,

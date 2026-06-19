@@ -2,6 +2,7 @@ import Link from "next/link";
 import {
   AlertTriangle,
   CalendarDays,
+  BookOpen,
   Clock3,
   ListChecks,
   Plus,
@@ -46,6 +47,10 @@ export default async function DashboardPage() {
           <h1 className="mt-2 text-3xl font-semibold tracking-normal">
             Decision Debt
           </h1>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-ink/60">
+            Capture decisions as structured risk, score the debt they create, and
+            reduce organizational uncertainty before it compounds.
+          </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <DemoDataButton hasDemoData={hasDemoData} />
@@ -90,6 +95,30 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
       ) : null}
+
+      <Card className="border-ink/10 bg-gradient-to-r from-white to-mint/35">
+        <CardContent>
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="space-y-2">
+              <p className="text-sm font-semibold uppercase tracking-[0.16em] text-moss">
+                Moonshot framing
+              </p>
+              <h2 className="text-xl font-semibold">
+                This is a foresight layer, not another task board.
+              </h2>
+              <p className="max-w-3xl text-sm leading-6 text-ink/65">
+                The prototype converts notes into decisions, scores unresolved
+                uncertainty, and preserves outcome learning so teams can see how
+                hesitation affects execution.
+              </p>
+            </div>
+            <Button asChild href="/moonshot" variant="outline">
+              <BookOpen className="h-4 w-4" />
+              Read the paper
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       {data.decisions.length === 0 ? (
         <EmptyState

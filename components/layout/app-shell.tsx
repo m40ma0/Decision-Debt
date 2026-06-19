@@ -12,6 +12,7 @@ import {
   Menu,
   Plus,
   RotateCcw,
+  Sparkles,
   X
 } from "lucide-react";
 import { signOutAction } from "@/app/actions/auth";
@@ -23,7 +24,8 @@ const navItems = [
   { href: "/decisions", label: "Inbox", icon: ClipboardList },
   { href: "/review", label: "Review", icon: RotateCcw },
   { href: "/history", label: "History", icon: History },
-  { href: "/analytics", label: "Analytics", icon: BarChart3 }
+  { href: "/analytics", label: "Analytics", icon: BarChart3 },
+  { href: "/moonshot", label: "Moonshot", icon: Sparkles }
 ];
 
 export function AppShell({
@@ -66,6 +68,9 @@ export function AppShell({
         <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3 sm:px-6 lg:px-8">
           <Link href="/dashboard" className="min-w-0">
             <p className="text-base font-semibold">Decision Debt</p>
+            <p className="truncate text-xs font-medium uppercase tracking-[0.16em] text-moss">
+              Foresight infrastructure
+            </p>
             <p className="truncate text-xs text-ink/55">{email}</p>
           </Link>
           <div className="ml-auto flex items-center gap-2">

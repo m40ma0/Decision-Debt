@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { extractDecisionIntakeCandidates } from "@/lib/decision-intake";
+import { buildMoonshotPaperMarkdown } from "@/lib/moonshot";
 import { calculateDecisionDebtScore } from "@/lib/scoring";
 import { detectDecisionTraps, getCostOfWaiting } from "@/lib/decision-intelligence";
 import { decisionFormSchema } from "@/lib/validation";
@@ -129,4 +130,12 @@ Confidence: 2`);
   assert.equal(candidates[0].owner, "Maya");
   assert.equal(candidates[0].deadline, "2026-06-18");
   assert.ok(candidates[0].options.length >= 2);
+});
+
+test("generates a moonshot paper blueprint", () => {
+  const paper = buildMoonshotPaperMarkdown();
+
+  assert.match(paper, /Decision Debt: Foresight Infrastructure for Teams/);
+  assert.match(paper, /## Prototype/);
+  assert.match(paper, /## System Architecture/);
 });

@@ -3,9 +3,9 @@ import "./globals.css";
 import { ToastProvider } from "@/components/toast-provider";
 
 export const metadata: Metadata = {
-  title: "Decision Debt",
+  title: "Decision Debt | Foresight Infrastructure",
   description:
-    "A decision management app for tracking unresolved choices, blockers, options, and outcomes."
+    "A decision management app that turns unresolved choices into explainable debt, cost of delay, and outcome learning."
 };
 
 export default function RootLayout({
